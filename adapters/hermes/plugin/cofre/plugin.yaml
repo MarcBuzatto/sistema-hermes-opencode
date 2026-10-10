@@ -1,0 +1,3 @@
+name: cofre
+version: "0.1.0"
+description: Injeta o contexto do Cofre (memória epistêmica em Obsidian) no prompt e lembra o agente de registrar checkpoints.

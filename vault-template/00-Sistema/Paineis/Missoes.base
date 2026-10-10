@@ -1,0 +1,26 @@
+filters:
+  and:
+    - 'tipo == "missao"'
+    - not:
+        - file.inFolder("00-Sistema")
+views:
+  - type: kanban
+    name: Quadro
+    groupBy:
+      property: note.status
+      direction: ASC
+    groupOrder:
+      - ativa
+      - pausada
+      - concluida
+      - cancelada
+    order:
+      - titulo
+      - projetos
+  - type: table
+    name: Tabela
+    order:
+      - titulo
+      - status
+      - projetos
+      - atualizada

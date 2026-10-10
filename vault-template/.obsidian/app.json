@@ -1,0 +1,9 @@
+{
+  "alwaysUpdateLinks": true,
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false,
+  "showUnsupportedFiles": false,
+  "userIgnoreFilters": [
+    "90-Arquivo/Exportacoes-NotebookLM/"
+  ]
+}

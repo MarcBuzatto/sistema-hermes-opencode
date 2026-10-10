@@ -1,0 +1,14 @@
+filters:
+  and:
+    - 'tipo == "captura"'
+    - 'status == "pendente"'
+    - not:
+        - file.inFolder("00-Sistema")
+views:
+  - type: table
+    name: Para triar
+    order:
+      - file.name
+      - projeto
+      - origem
+      - capturado_em
