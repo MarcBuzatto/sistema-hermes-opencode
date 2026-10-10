@@ -1,0 +1,1 @@
+# sistema-hermes-opencode
