@@ -38,10 +38,10 @@ py -3 scripts\instalar.py --vault "$env:USERPROFILE\Obsidian\Cofre" --git
 
 O que acontece, em ordem:
 1. Copia o motor para `~/.local/share/cofre/app` (Windows: `%LOCALAPPDATA%\cofre\app`) e cria o comando `cofre` (`~/.local/bin/cofre` ou `%LOCALAPPDATA%\cofre\bin\cofre.cmd`, adicionado ao PATH do usuário; use `--sem-path` para não mexer no PATH).
-2. Cria ou completa o vault a partir do template (arquivos existentes nunca são sobrescritos) e grava `~/.config/cofre/config.json` (Windows: `%APPDATA%\cofre\config.json`) com o caminho do vault.
+2. Cria ou completa o vault a partir do template (arquivos existentes nunca são sobrescritos), grava as skills do cofre em `60-Skills/sistema/` e grava `~/.config/cofre/config.json` (Windows: `%APPDATA%\cofre\config.json`) com o caminho do vault.
 3. Com `--git`, inicializa o repositório do vault.
-4. Instala as skills em `~/.agents/skills`.
-5. Integra o OpenCode e o Hermes (detalhes em [04-integracoes.md](04-integracoes.md)).
+4. Remove blocos que versões antigas do instalador tenham deixado em `AGENTS.md`/`SOUL.md`/`CLAUDE.md`. Nenhum arquivo de instruções seu é editado.
+5. Integra o OpenCode e o Hermes, inclusive apontando os dois para as skills do vault (detalhes em [04-integracoes.md](04-integracoes.md)).
 6. Roda `cofre doctor` e lista pendências.
 
 Flags úteis:

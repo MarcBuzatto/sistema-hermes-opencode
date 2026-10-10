@@ -27,13 +27,15 @@ ROTULOS = {
 }
 
 REGRAS = [
-    "Hierarquia de confiança: código/comando executado agora > usuário nesta conversa > VERIFICADO > HIPÓTESE > sua memória.",
+    "Confiança: código/comando que você acabou de ver > usuário nesta conversa > VERIFICADO > HIPÓTESE > sua memória.",
     "Nunca apresente HIPÓTESE ou CONTESTADO como fato; diga 'hipótese do cofre, não verificada'.",
-    "Nunca repita uma afirmação listada em Armadilhas (REFUTADO).",
-    "Descobriu algo? cofre_registrar_fato (hipótese sem evidência; verificado só com evidência copiada do arquivo/comando).",
-    "Errou ou o usuário corrigiu? cofre_atualizar_fato (contestar/refutar) com a correção — não só na conversa.",
-    "Terminou uma etapa ou a conversa ficou longa? cofre_checkpoint (resumo, feito, próximos passos).",
-    "Antes de afirmar algo sobre o projeto que não está aqui: cofre_buscar.",
+    "Nunca repita uma afirmação das Armadilhas (REFUTADO).",
+    "Descobriu algo? cofre_registrar_fato: hipótese sem prova; verificado só com evidência copiada EXATAMENTE (caminho absoluto).",
+    "Usuário corrigiu ou o código contradiz o cofre? cofre_atualizar_fato (refutar/contestar). Corrigir só na conversa não basta.",
+    "Decisão de projeto: cofre_decisao (fica 'aceita' só com as palavras do usuário).",
+    "Fim de etapa, conversa longa ou antes de encerrar: cofre_checkpoint.",
+    "Antes de afirmar algo do projeto que não está aqui: cofre_buscar. Nunca grave senhas, tokens ou chaves.",
+    "Procedimento completo: skill cofre-protocolo.",
 ]
 
 

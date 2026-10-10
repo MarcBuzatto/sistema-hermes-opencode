@@ -15,8 +15,7 @@ plugins:
     - cofre
 
 skills:
-  external_dirs:
-    - ~/.agents/skills
+  create_dir: /home/VOCE/Obsidian/Cofre/60-Skills   # lê as skills do vault e cria as novas lá
   disabled:
     - obsidian          # skill nativa que escreve no vault sem as regras do cofre
   write_approval: true  # skills criadas pelo agente passam por você

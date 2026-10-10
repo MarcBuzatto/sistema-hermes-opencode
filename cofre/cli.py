@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, contexto, notebooklm, registrar
+from . import skills as skills_mod
 from .config import ErroCofre, arquivo_config_usuario, gravar_config_usuario, ler_config_usuario, resolver_vault
 from .registrar import Autor
 from .revisar import relatorio, revisar, salvar_relatorio
@@ -201,6 +202,26 @@ def cmd_importar_memoria(a):
               else f"Nenhuma memória encontrada em {pasta}.")
 
 
+def _destino_skills_opencode() -> Path:
+    base = os.environ.get("OPENCODE_CONFIG_DIR") or str(Path.home() / ".config" / "opencode")
+    return Path(base) / "skills"
+
+
+def cmd_skills(a):
+    cofre = _cofre(a)
+    if a.acao == "listar":
+        _imprimir(skills_mod.resumo(cofre.raiz))
+    elif a.acao == "verificar":
+        achados = skills_mod.verificar(cofre.raiz)
+        _imprimir("\n".join(f"- [{g}] {n}: {m}" for g, n, m in achados) or "Skills sem problemas.")
+        return 1 if any(g == "erro" for g, _, _ in achados) else 0
+    else:
+        destino = Path(os.path.expanduser(a.destino)) if a.destino else _destino_skills_opencode()
+        copiadas, removidas, avisos = skills_mod.sincronizar(cofre.raiz, destino, remover=a.remover)
+        _imprimir(f"Destino: {destino}\nCopiadas: {len(copiadas)} · Removidas: {len(removidas)}"
+                  + "".join(f"\n[aviso] {x}" for x in avisos))
+
+
 def cmd_mcp(a):
     from .mcp import main as mcp_main
     return mcp_main(a.vault)
@@ -259,6 +280,7 @@ def cmd_doctor(a):
         linhas.append(f"git no vault: {'[ok]' if (cofre.raiz / '.git').exists() else '[sem git: sem histórico de quem gravou o quê]'}")
         proj = contexto.resolver_projeto(cofre, os.getcwd())
         linhas.append(f"projeto do diretório atual: {proj.nome if proj else '(nenhum)'}")
+        linhas.append(f"skills no vault: {len(skills_mod.listar(cofre.raiz))} em {skills_mod.pasta_skills(cofre.raiz)}")
     except ErroCofre as e:
         linhas.append(f"vault: [erro] {e}")
     for rotulo, caminho in _integracoes():
@@ -270,11 +292,9 @@ def _integracoes() -> list[tuple[str, Path]]:
     oc = Path(os.environ.get("OPENCODE_CONFIG_DIR") or (Path.home() / ".config" / "opencode"))
     hh = _hermes_home(None)
     return [
-        ("OpenCode AGENTS.md global", oc / "AGENTS.md"),
+        ("OpenCode opencode.json", oc / "opencode.json"),
         ("OpenCode comandos", oc / "commands" / "checkpoint.md"),
         ("OpenCode plugin", oc / "plugins" / "cofre.js"),
-        ("Skills compartilhadas", Path.home() / ".agents" / "skills" / "cofre-protocolo" / "SKILL.md"),
-        ("Hermes SOUL.md", hh / "SOUL.md"),
         ("Hermes plugin", hh / "plugins" / "cofre" / "__init__.py"),
     ]
 
@@ -412,6 +432,11 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("--hermes-home")
     sp.add_argument("--projeto")
 
+    sp = novo("skills", cmd_skills, "Skills do vault (60-Skills): listar | verificar | sincronizar")
+    sp.add_argument("acao", choices=["listar", "verificar", "sincronizar"])
+    sp.add_argument("--destino", help="sincronizar: pasta de destino (padrão: ~/.config/opencode/skills)")
+    sp.add_argument("--remover", action="store_true", help="sincronizar: remove do destino as cópias feitas pelo cofre")
+
     novo("mcp", cmd_mcp, "Inicia o servidor MCP (stdio)")
 
     sp = novo("init", cmd_init, "Cria/completa um vault a partir do template")
@@ -425,11 +450,12 @@ def criar_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except (OSError, ValueError):
-            pass
+    for fluxo in (sys.stdout, sys.stderr):
+        if hasattr(fluxo, "reconfigure"):
+            try:
+                fluxo.reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
     args = criar_parser().parse_args(argv)
     try:
         codigo = args.func(args)

@@ -54,6 +54,8 @@ O NotebookLM de consumidor não tem API pública oficial; as integrações "MCP 
 
 ## Pendências para quando a pesquisa chegar
 
+- **Pesquisa do NotebookLM -> skill em `60-Skills/`**: você já cria skills a partir de pesquisas do NotebookLM; o formato (estrutura do `SKILL.md`, o que vai para `references/`, como registrar a fonte e o status de validação da skill) será definido a partir da sua pesquisa.
+
 - Ajustar a divisão em arquivos ao que funcionar melhor nas suas perguntas (por tema, por período, por cliente).
 - Avaliar formatos de saída do NotebookLM que valem guardar (guias de estudo, FAQ, linha do tempo, mapas mentais) e um modelo de nota para cada.
 - Definir se notebooks transversais (conhecimento técnico, não projeto) devem ter exportação própria a partir de `30-Conhecimento`.

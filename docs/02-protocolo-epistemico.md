@@ -1,6 +1,6 @@
 # Protocolo epistêmico
 
-O texto exato que as IAs recebem está em [`adapters/shared/PROTOCOLO-AGENTE.md`](../adapters/shared/PROTOCOLO-AGENTE.md) (também copiado para `00-Sistema/Protocolo das IAs.md` no vault). Este documento explica o porquê de cada regra e o que é garantido em código.
+O protocolo chega aos modelos em três camadas, sem tocar em `AGENTS.md`/`SOUL.md`: 9 regras curtas no pacote de contexto injetado pelos plugins (`REGRAS` em `cofre/contexto.py`), um resumo nas instruções do servidor MCP (`cofre/mcp.py`) e o texto completo na skill [`cofre-protocolo`](../adapters/shared/skills/cofre-protocolo/SKILL.md) (instalada em `60-Skills/sistema/` no vault), carregada sob demanda. Este documento explica o porquê de cada regra e o que é garantido em código.
 
 ## Status
 
@@ -65,6 +65,10 @@ Fatos verificados recebem `revisar_em` (padrão: 90 dias, `validade_padrao_dias`
 ## Sessões e estado são diário, não verdade
 
 `Estado` e `Sessões` são escritos por agentes e marcados como tal. Servem para retomar o fio. Qualquer afirmação factual que importe deve virar nota de fato com status.
+
+## Skills também carregam erro
+
+Skill criada a partir de pesquisa (NotebookLM, artigos) pode conter informação errada, e o modelo segue skill com mais confiança do que segue hipótese. Por isso a skill `cofre-protocolo` manda avisar o usuário antes de seguir skill marcada como rascunho ou sem fonte, e `cofre revisar` verifica as skills (description ausente, nome divergente da pasta, IDs repetidos, credenciais). O formato de proveniência das skills (fonte, status, validação) será definido junto com a sua pesquisa sobre NotebookLM.
 
 ## Memória nativa dos agentes
 

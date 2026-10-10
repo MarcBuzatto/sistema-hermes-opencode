@@ -1,65 +1,71 @@
 # Integrações
 
+## Princípio: nenhum arquivo de instruções é editado
+
+O cofre não escreve em `AGENTS.md`, `SOUL.md`, `CLAUDE.md` nem em nenhum outro arquivo de instruções. Esses arquivos costumam estar grandes demais para o modelo ler inteiros, e somar mais texto neles piora o problema. O protocolo chega por três canais curtos:
+
+| Canal | Conteúdo | Tamanho |
+| --- | --- | --- |
+| Plugin (Hermes e OpenCode) | Pacote de contexto do projeto com 9 regras no fim, no prompt de sistema | até `contexto_sistema_max_chars` (padrão 3500 caracteres, regras incluídas) |
+| Instruções do servidor MCP | Resumo das regras (para clientes sem plugin, como Claude Code e Codex) | ~900 caracteres |
+| Skill `cofre-protocolo` | Protocolo completo e referência | carregada só quando o modelo precisa |
+
+Se uma versão antiga do instalador tiver deixado um bloco `### >>> COFRE ...` nesses arquivos, o instalador atual remove só esse bloco.
+
 ## Quem usa o cofre e quem não usa
 
 | Ferramenta | Usa o cofre? | Como |
 | --- | --- | --- |
-| Hermes Agent (qualquer modelo: OpenCode Zen/Go, Claude, GPT etc.) | Sim | `SOUL.md`, plugin, MCP, skills, ajustes de memória |
-| OpenCode (V1 >= 1.18.29 e V2) | Sim | `AGENTS.md` global, plugin, MCP, comandos, skills |
-| Claude Code CLI | Opcional (`--claude-code`) | `~/.claude/CLAUDE.md` + MCP escopo usuário |
-| Codex CLI | Opcional (`--codex`) | `~/.codex/AGENTS.md` + `config.toml` |
-| Claude Desktop (chat) | Não | Nenhum arquivo dele é alterado (`claude_desktop_config.json` intocado) |
+| Hermes Agent (qualquer modelo: OpenCode Zen/Go, Claude, GPT etc.) | Sim | Plugin, MCP, skills do vault, ajustes de memória |
+| OpenCode (V1 >= 1.18.29 e V2) | Sim | Plugin, MCP, comandos, skills do vault |
+| Claude Code CLI | Opcional (`--claude-code`) | Só o servidor MCP (escopo usuário) |
+| Codex CLI | Opcional (`--codex`) | Só o servidor MCP (`config.toml`) |
+| Claude Desktop (chat) | Não | Nenhum arquivo dele é alterado |
 | ChatGPT app | Não | Nenhum conector ou arquivo é criado |
 
-O isolamento é estrutural: o cofre só existe para quem tem o servidor MCP `cofre` configurado e o protocolo instalado. O instalador nunca escreve na configuração dos apps de chat.
-
-Atenção a dois casos de borda:
-- A aba **Code** do app Claude Desktop é o Claude Code e lê `~/.claude/CLAUDE.md`. Por isso `--claude-code` é opcional e desligado por padrão: ligue só se quiser o cofre também ali.
+O isolamento é estrutural: só quem tem o servidor MCP `cofre` (e, no Hermes/OpenCode, o plugin) usa o cofre. Casos de borda:
+- A aba **Code** do app Claude Desktop é o Claude Code; por isso `--claude-code` vem desligado.
 - O app **Codex** compartilha `~/.codex` com o Codex CLI; mesma lógica para `--codex`.
-- O OpenCode também lê skills de `~/.claude/skills`. O cofre instala as dele em `~/.agents/skills`, que o Claude Desktop não usa.
 
 ## Hermes Agent
 
-Arquivos e configurações tocados (Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERMES_HOME`):
+Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERMES_HOME`.
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `SOUL.md` | Bloco gerenciado com o protocolo (seu conteúdo fora do bloco é preservado; backup `SOUL.md.cofre-bak`) | O Hermes não tem `AGENTS.md` global; o `SOUL.md` é o único arquivo carregado em toda sessão, em qualquer diretório |
-| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto (preservada na compactação), âncora com o foco atual a cada N turnos, aviso ao fechar sessão longa sem checkpoint |
-| `mcp_servers.cofre` | Servidor MCP stdio | As 10 ferramentas `cofre_*` (no Hermes aparecem com prefixo do servidor) |
+| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação), âncora com o foco atual a cada N turnos, aviso ao fechar sessão longa sem checkpoint |
+| `mcp_servers.cofre` | Servidor MCP stdio | As 10 ferramentas `cofre_*` |
 | `plugins.enabled` | `+ cofre` | Plugins do usuário são opt-in |
-| `skills.external_dirs` | `+ ~/.agents/skills` | Skills compartilhadas com o OpenCode |
+| `skills.create_dir` | `<vault>/60-Skills` | O Hermes lê as skills do vault e cria as que aprender lá. Se você já usa `create_dir` para outra pasta, o instalador mantém e adiciona o vault em `skills.external_dirs` |
+| `skills.write_approval` | `true` | Skill criada/editada pelo agente espera sua aprovação (`/skills pending`) antes de ir para o vault |
 | `skills.disabled` | `+ obsidian` (pule com `--manter-skill-obsidian`) | A skill nativa escreve no vault sem as regras do cofre |
 | `memory.memory_enabled` | `false` (pule com `--manter-memoria-hermes`) | `MEMORY.md` era a principal fonte de "fatos errados persistentes" |
-| `memory.write_approval` | `true` | `USER.md` (perfil) só muda com sua aprovação (`/memory pending`, `/memory approve`) |
-| `skills.write_approval` | `true` | Skills aprendidas pelo agente passam por você (`/skills pending`) |
+| `memory.write_approval` | `true` | `USER.md` só muda com sua aprovação (`/memory pending`) |
 
-As listas são mescladas (o instalador lê o valor atual com `hermes config get --json` e acrescenta). Antes de desligar o `MEMORY.md`, o instalador faz backup e leva cada entrada para `01-Inbox` como captura não verificada.
+`SOUL.md` não é tocado. Listas são mescladas (o instalador lê o valor atual com `hermes config get --json`). Antes de desligar o `MEMORY.md`, ele faz backup e leva cada entrada para `01-Inbox` como captura não verificada.
 
-O plugin não depende do modelo lembrar de nada: a seção de sistema entra no início da sessão; a âncora lê o `Estado` do disco, então reflete checkpoints feitos no meio da conversa.
-
-Skills viram comandos: `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar`, `/cofre-notebooklm`.
-
-Observação sobre o scanner de segurança do Hermes: arquivos de contexto de projeto com padrões como comentários HTML ocultos são bloqueados. Os textos do cofre evitam esses padrões, e o `SOUL.md` não é bloqueado (só gera aviso).
+Skills do Hermes com o mesmo nome de uma skill do vault têm precedência (ordem do Hermes: projeto, `~/.hermes/skills`, `create_dir`, `external_dirs`). Skills viram comandos: `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar`, `/cofre-notebooklm`, `/cofre-protocolo`.
 
 ## OpenCode
 
-Arquivos tocados em `~/.config/opencode` (ou `OPENCODE_CONFIG_DIR`):
+Em `~/.config/opencode` (ou `OPENCODE_CONFIG_DIR`). `AGENTS.md` não é tocado.
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `AGENTS.md` | Bloco gerenciado com o protocolo (resto preservado; backup) | Instruções globais carregadas em toda sessão (V1 e V2). Na V2 o campo `instructions` do `opencode.json` não é resolvido, por isso o cofre não depende dele |
-| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hooks `context` (contexto no sistema a cada chamada, com cache de 30 s) e `compaction`; V1: `experimental.chat.system.transform` e `experimental.session.compacting` |
-| `opencode.json` | Servidor MCP `cofre` | V2 detectada: `mcp.servers.cofre` com `codemode: false` (ferramentas direto na lista nativa, melhor para modelos fracos). V1 ou versão desconhecida: `mcp.cofre` (formato aceito pelas duas). Se você usa `opencode.jsonc`, o instalador mostra o trecho para colar |
+| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hooks `context` (contexto e regras no sistema a cada chamada, com cache de 30 s) e `compaction`; V1: `experimental.chat.system.transform` e `experimental.session.compacting`. Sem o plugin, só as instruções do MCP chegam ao modelo |
+| `opencode.json` > MCP | Servidor `cofre` | V2: `mcp.servers.cofre` com `codemode: false` (ferramentas direto na lista nativa, melhor para modelos fracos). V1 ou versão desconhecida: `mcp.cofre`. Com `opencode.jsonc`, o instalador mostra o trecho para colar |
+| `opencode.json` > `skills` | `+ <vault>/60-Skills` (só V2) | A V2 lê skills de qualquer profundidade nessa pasta |
+| `skills/` | Cópias das skills do vault (só V1 ou versão desconhecida) | A V1 só enxerga `~/.config/opencode/skills/*/SKILL.md`. O plugin refaz a cópia a cada início; as cópias têm `.cofre-sync` e skills suas nessa pasta não são tocadas |
 | `commands/` | `ctx.md`, `checkpoint.md`, `corrigir.md`, `revisar-cofre.md` | Comandos `/ctx`, `/checkpoint`, `/corrigir`, `/revisar-cofre`. Arquivos seus com o mesmo nome não são sobrescritos |
-| `~/.agents/skills/` | Skills `cofre-*` | Descobertas pelo OpenCode (e pelo Hermes via `external_dirs`) |
 
-O servidor MCP recebe do OpenCode o ID da sessão (`_meta["ai.opencode/sessionID"]`) e usa isso para agrupar os checkpoints de uma conversa na mesma nota de sessão.
+O servidor MCP recebe do OpenCode o ID da sessão (`_meta["ai.opencode/sessionID"]`) e agrupa os checkpoints de uma conversa na mesma nota de sessão.
 
 ## Claude Code CLI e Codex CLI (opcionais)
 
-- `--claude-code`: bloco em `~/.claude/CLAUDE.md` e `claude mcp add -s user cofre -- <python> <app> mcp`.
-- `--codex`: bloco em `~/.codex/AGENTS.md` e entrada `[mcp_servers.cofre]` em `~/.codex/config.toml` (entre marcadores `# cofre:inicio`/`# cofre:fim`).
+- `--claude-code`: `claude mcp add -s user cofre -- <python> <app> mcp`. O Claude Code inclui as instruções do servidor MCP no contexto.
+- `--codex`: entrada `[mcp_servers.cofre]` em `~/.codex/config.toml` (entre `# cofre:inicio` e `# cofre:fim`). Não verifiquei se o Codex repassa as instruções do servidor MCP ao modelo; se não repassar, o modelo vê só as descrições das ferramentas.
+
+Nenhum dos dois recebe plugin de injeção de contexto; o modelo precisa chamar `cofre_contexto` (as instruções do MCP pedem isso).
 
 ## Windows nativo e WSL ao mesmo tempo
 
@@ -101,4 +107,4 @@ Documentação oficial lida nos repositórios em outubro de 2026:
 - OpenCode V2 (2.0.26): `instructions.mdx`, `skills.mdx`, `commands.mdx`, `compaction.mdx`, `mcp-servers.mdx`, `plugins.mdx`, `build/plugins/index.mdx`, `build/plugins/migrate-v1.mdx`, `migrate-v1.mdx` em [sst/opencode](https://github.com/sst/opencode).
 - Obsidian Bases: `Bases syntax.md`, `Views.md`, `Functions.md` em [obsidianmd/obsidian-help](https://github.com/obsidianmd/obsidian-help).
 
-Essas ferramentas mudam rápido. Se uma atualização quebrar algo, o ponto mais sensível é a API de plugins (o OpenCode já trocou a dele na V2); o protocolo no `AGENTS.md`/`SOUL.md`, o MCP e os comandos são as partes mais estáveis.
+Essas ferramentas mudam rápido. Se uma atualização quebrar algo, o ponto mais sensível é a API de plugins (o OpenCode já trocou a dele na V2); o MCP, as skills e os comandos são as partes mais estáveis.

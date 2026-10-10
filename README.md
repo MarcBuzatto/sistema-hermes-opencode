@@ -19,6 +19,8 @@ O Cofre ataca as três com regras que rodam **em código**, não só no prompt:
 | Persistir no erro | Fato refutado vira **armadilha** visível em toda sessão, com a versão correta ao lado; registrar de novo a afirmação refutada (ou paráfrase) é **bloqueado** |
 | Memória nativa contaminada | Instalador desliga o `MEMORY.md` do Hermes, liga aprovação para `USER.md`/skills e leva as entradas antigas para triagem |
 
+Nada disso vai para o seu `AGENTS.md` (nem para o `SOUL.md` do Hermes): o protocolo chega aos modelos pelos plugins (prompt de sistema, poucas linhas), pelas instruções do servidor MCP e pela skill `cofre-protocolo`, carregada só quando precisa. As **skills** também ficam no vault (`60-Skills/`), e Hermes e OpenCode leem de lá.
+
 ## Como fica
 
 ```
@@ -30,6 +32,8 @@ Hermes        OpenCode            <- usam o ecossistema
 (plugin:      (plugin: contexto
  contexto no   no sistema + na
  sistema)      compactação)
+   ^            ^
+   +-- skills de 60-Skills/ (no vault)
 
 Claude Desktop / ChatGPT app      <- NÃO tocados
 ```
@@ -69,7 +73,7 @@ Guia completo (Windows nativo, WSL, Linux/macOS, verificação e desinstalação
 | --- | --- |
 | OpenCode | `/ctx` no início, `/checkpoint` ao fim de cada etapa, `/corrigir <correção>` quando a IA errar, `/revisar-cofre` de vez em quando |
 | Hermes | `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar` (skills viram comandos) |
-| Obsidian | Nota `00-Sistema/Inicio`: hipóteses, contestados, revisão vencida, decisões aguardando você, inbox |
+| Obsidian | Nota `00-Sistema/Inicio`: hipóteses, contestados, revisão vencida, decisões aguardando você, inbox, skills |
 | Terminal | `cofre revisar --salvar` semanal; `cofre contexto` para ver o que as IAs recebem |
 
 Mais em [docs/07-uso-diario.md](docs/07-uso-diario.md).
@@ -78,12 +82,11 @@ Mais em [docs/07-uso-diario.md](docs/07-uso-diario.md).
 
 | Caminho | Conteúdo |
 | --- | --- |
-| `cofre/` | Motor em Python puro (sem dependências): vault, regras epistêmicas, contexto, revisão, NotebookLM, CLI e servidor MCP |
-| `vault-template/` | Vault inicial: pastas, perfil, configuração, painéis (Bases), modelos e um projeto de exemplo |
-| `adapters/shared/` | Protocolo dos agentes (texto único para todas as IAs) e skills compartilhadas (`~/.agents/skills`) |
-| `adapters/hermes/` | Bloco do `SOUL.md`, plugin do Hermes e exemplo de `config.yaml` |
-| `adapters/opencode/` | Bloco do `AGENTS.md` global, comandos e plugin (V1 e V2) |
-| `adapters/claude-code/`, `adapters/codex/` | Integrações opcionais (desligadas por padrão) |
+| `cofre/` | Motor em Python puro (sem dependências): vault, regras epistêmicas, contexto, skills, revisão, NotebookLM, CLI e servidor MCP |
+| `vault-template/` | Vault inicial: pastas (inclusive `60-Skills`), perfil, configuração, painéis (Bases), modelos e um projeto de exemplo |
+| `adapters/shared/skills/` | Skills do cofre (`cofre-protocolo` com o protocolo completo, checkpoint, corrigir, revisar, NotebookLM), instaladas em `60-Skills/sistema/` |
+| `adapters/hermes/` | Plugin do Hermes e exemplo de `config.yaml` |
+| `adapters/opencode/` | Comandos e plugin (V1 e V2) |
 | `scripts/instalar.py` | Instalador/desinstalador multiplataforma, idempotente, com `--dry-run` |
 | `docs/` | Arquitetura, protocolo, estrutura do vault, integrações, instalação, NotebookLM e uso diário |
 | `tests/` | Testes (`python3 -m unittest discover -s tests`) |

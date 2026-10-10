@@ -24,5 +24,8 @@
 ## Projetos
 ![[Projetos.base]]
 
+## Skills
+![[Skills.base]]
+
 ## Armadilhas (refutados)
 ![[Fatos.base#Armadilhas (refutados)]]

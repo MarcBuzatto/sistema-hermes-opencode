@@ -7,7 +7,7 @@ ancora_a_cada_turnos: 5
 lembrar_checkpoint_apos_turnos: 4
 git_autocommit: true
 contexto_max_chars: 6000
-contexto_sistema_max_chars: 3800
+contexto_sistema_max_chars: 3500
 fatos_verificados_no_contexto: 15
 ---
 # Configuração do cofre

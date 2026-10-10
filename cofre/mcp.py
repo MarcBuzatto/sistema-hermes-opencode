@@ -21,11 +21,12 @@ from .vault import Cofre
 
 VERSOES = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 INSTRUCOES = (
-    "Cofre = memória compartilhada do usuário em Obsidian. Regras: (1) chame cofre_contexto no início e após "
-    "compactações; (2) hierarquia: código/comando agora > usuário > VERIFICADO > HIPÓTESE > sua memória; "
-    "(3) nunca trate HIPÓTESE como fato nem repita afirmações REFUTADAS; (4) registre descobertas com "
-    "cofre_registrar_fato (evidência copiada exatamente) e correções com cofre_atualizar_fato; "
-    "(5) cofre_checkpoint ao fim de cada etapa."
+    "Cofre = memória compartilhada do usuário em Obsidian. (1) Chame cofre_contexto no início e após compactações. "
+    "(2) Confiança: código/comando visto agora > usuário > VERIFICADO > HIPÓTESE > sua memória. "
+    "(3) Nunca trate HIPÓTESE como fato nem repita afirmações REFUTADAS (Armadilhas). "
+    "(4) Descobertas: cofre_registrar_fato (verificado só com evidência copiada exatamente, caminho absoluto). "
+    "(5) Correções do usuário ou conflitos com o código: cofre_atualizar_fato. (6) Decisões: cofre_decisao. "
+    "(7) cofre_checkpoint ao fim de cada etapa. (8) Nunca grave segredos. Procedimento completo: skill cofre-protocolo."
 )
 
 

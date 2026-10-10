@@ -1,6 +1,8 @@
 # Cofre — como este vault funciona
 
-Este vault é a memória de longo prazo das IAs que trabalham no seu PC (Hermes e OpenCode, e opcionalmente Claude Code/Codex CLI). Elas leem e escrevem aqui através do servidor MCP `cofre`. Você lê e edita normalmente pelo Obsidian.
+Este vault é a memória de longo prazo das IAs que trabalham no seu PC (Hermes e OpenCode, e opcionalmente Claude Code/Codex CLI). Elas leem e escrevem aqui através do servidor MCP `cofre` e carregam as skills de `60-Skills`. Você lê e edita normalmente pelo Obsidian.
+
+Nada disso depende do seu `AGENTS.md` ou do `SOUL.md`: o protocolo chega aos modelos pelos plugins do Hermes e do OpenCode (prompt de sistema), pelas instruções do servidor MCP e pela skill `cofre-protocolo`.
 
 ## A ideia central
 Modelos (principalmente os mais fracos) esquecem, resumem errado e, pior, guardam suposições como se fossem verdade e passam a defender o erro. O cofre resolve isso separando **o que foi comprovado** do **que foi suposto**:
@@ -18,7 +20,7 @@ Fatos refutados não são apagados: eles aparecem para as IAs como armadilhas, c
 ## Onde fica cada coisa
 | Pasta | Conteúdo |
 | --- | --- |
-| `00-Sistema` | Configuração, seu perfil, protocolo, painéis (Bases), modelos e relatórios |
+| `00-Sistema` | Configuração, seu perfil, painéis (Bases), modelos e relatórios |
 | `01-Inbox` | Capturas brutas para você triar |
 | `02-Sessoes` | Diário de sessões sem projeto |
 | `10-Projetos/<slug>` | Hub do projeto, `<slug> - Estado` (memória de trabalho), `Fatos/`, `Decisoes/`, `Sessoes/` |
@@ -26,6 +28,7 @@ Fatos refutados não são apagados: eles aparecem para as IAs como armadilhas, c
 | `30-Conhecimento` | Fatos e decisões globais (máquina, ferramentas, conhecimento que vale para tudo) |
 | `40-Clientes` | Um hub por cliente (preferências e restrições) |
 | `50-Fontes` | Material externo: pesquisas, documentação, respostas do NotebookLM |
+| `60-Skills` | Skills que Hermes e OpenCode carregam sob demanda (formato Agent Skills) |
 | `90-Arquivo` | Projetos encerrados e exportações para o NotebookLM |
 
 ## Sua rotina (10 minutos, 1 a 2 vezes por semana)

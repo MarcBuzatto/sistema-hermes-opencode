@@ -15,6 +15,10 @@ import sys
 
 COFRE_APP = r"{{COFRE_APP}}"
 log = logging.getLogger("cofre")
+LINHA_HERMES = (
+    "No Hermes: a ferramenta memory é só para preferências que o usuário confirmou; fatos de projeto, "
+    "decisões e progresso vão para o cofre. Depois de uma compactação, chame cofre_contexto."
+)
 
 _turnos = {}
 _checkpoints = set()
@@ -57,7 +61,10 @@ def register(ctx):
         cwd = info.get("cwd") or os.getcwd()
         if info.get("session_id"):
             _cwd_sessao[info["session_id"]] = cwd
-        return _texto(cwd, "sistema")[:4000]
+        texto = _texto(cwd, "sistema")
+        if not texto:
+            return ""
+        return (texto + "\n" + LINHA_HERMES)[:4000]
 
     ctx.register_system_prompt_section("cofre.contexto", secao, position="after_memory", max_chars=4000)
 

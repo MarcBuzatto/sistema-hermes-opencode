@@ -18,6 +18,15 @@
 
 O Hermes avisa ao fechar uma sessão longa sem checkpoint.
 
+## Skills
+
+As skills ficam em `60-Skills/` no vault e aparecem para Hermes e OpenCode como skills normais.
+
+- Para criar uma skill à mão: crie `60-Skills/<categoria>/<nome-da-skill>/SKILL.md` com `name` (igual ao nome da pasta) e `description` no frontmatter. No Hermes ela aparece na próxima sessão; no OpenCode V2 também; no V1 o plugin copia ao iniciar.
+- Skills que o Hermes aprende caem em `60-Skills/` depois que você aprova em `/skills pending`.
+- `cofre skills listar` e `cofre skills verificar` mostram o que existe e o que está mal formado.
+- O fluxo "pesquisa do NotebookLM -> skill" ainda não está definido: depende da sua pesquisa.
+
 ## Rotina semanal (10 a 15 minutos)
 
 1. `cofre revisar --salvar` no terminal (relatório em `00-Sistema/Relatorios/`).
@@ -47,6 +56,8 @@ cofre projeto listar
 cofre revisar --projeto-atual --salvar
 cofre exportar-notebooklm loja-acme
 cofre importar-notebooklm resposta.md --titulo "Briefing" --projeto loja-acme
+cofre skills listar
+cofre skills verificar
 cofre doctor
 ```
 

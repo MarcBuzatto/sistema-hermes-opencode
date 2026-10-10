@@ -13,11 +13,12 @@ O comportamento descrito ("lembram, mas lembram errado e defendem o erro") tem c
 
 1. **Uma fonte de verdade fora do modelo**, legível e editável por você: o vault do Obsidian.
 2. **Status epistêmico em toda informação** (hipótese, verificado, contestado, refutado, obsoleto) e hierarquia explícita de confiança.
-3. **Regras aplicadas em código.** Modelos fracos ignoram instruções; por isso as regras críticas são validadas pelo servidor (evidência conferida no disco, bloqueio de afirmação refutada, citação obrigatória do usuário para decisões aceitas, bloqueio de credenciais).
-4. **Contexto reinjetado mecanicamente**, sem depender de o modelo lembrar de pedir.
-5. **Erros viram anticorpos**: fatos refutados não são apagados; aparecem como armadilhas.
-6. **Auditável e reversível**: cada escrita de agente vira commit git no vault, com o agente/modelo que gravou.
-7. **Escopo controlado**: só agentes de terminal configurados usam o cofre; apps de chat ficam de fora.
+3. **Não inflar arquivos de instrução.** Nada vai para `AGENTS.md`, `SOUL.md` ou `CLAUDE.md`: são arquivos que já costumam estar grandes demais para o modelo ler inteiros. O protocolo entra por canais curtos e sob demanda (9 regras no prompt via plugin, instruções do MCP, skill `cofre-protocolo`).
+4. **Regras aplicadas em código.** Modelos fracos ignoram instruções; por isso as regras críticas são validadas pelo servidor (evidência conferida no disco, bloqueio de afirmação refutada, citação obrigatória do usuário para decisões aceitas, bloqueio de credenciais).
+5. **Contexto reinjetado mecanicamente**, sem depender de o modelo lembrar de pedir.
+6. **Erros viram anticorpos**: fatos refutados não são apagados; aparecem como armadilhas.
+7. **Auditável e reversível**: cada escrita de agente vira commit git no vault, com o agente/modelo que gravou.
+8. **Escopo controlado**: só agentes de terminal configurados usam o cofre; apps de chat ficam de fora.
 
 ## Componentes
 
@@ -31,6 +32,7 @@ flowchart TB
             S["Sessões (diário)"]
             M["Missões"]
             P["Perfil do usuário"]
+            K["60-Skills (skills)"]
         end
         Motor["Motor cofre (Python, sem dependências)<br/>validação epistêmica · contexto · revisão · NotebookLM"]
         MCP["Servidor MCP 'cofre' (stdio)<br/>10 ferramentas"]
@@ -40,22 +42,19 @@ flowchart TB
         CLI --> Motor
 
         subgraph Hermes["Hermes Agent"]
-            HS["SOUL.md: protocolo"]
-            HP["Plugin cofre:<br/>seção do prompt de sistema<br/>âncora a cada N turnos<br/>aviso sem checkpoint"]
+            HP["Plugin cofre:<br/>contexto + regras no prompt de sistema<br/>âncora a cada N turnos<br/>aviso sem checkpoint"]
             HM["memory: MEMORY.md desligado<br/>USER.md com aprovação"]
         end
         subgraph OpenCode["OpenCode"]
-            OA["AGENTS.md global: protocolo"]
-            OP["Plugin cofre:<br/>contexto no sistema a cada chamada<br/>e na compactação"]
+            OP["Plugin cofre:<br/>contexto + regras a cada chamada<br/>e na compactação"]
             OC["/ctx /checkpoint /corrigir /revisar-cofre"]
         end
-        Skills["~/.agents/skills (compartilhadas)"]
         Hermes -- "ferramentas MCP" --> MCP
         OpenCode -- "ferramentas MCP" --> MCP
         HP --> Motor
         OP --> CLI
-        Hermes --- Skills
-        OpenCode --- Skills
+        Hermes -- "skills.create_dir" --> K
+        OpenCode -- "skills (V2) / cópia (V1)" --> K
         Voce(("Você")) -- "lê, edita, aprova" --> Vault
     end
     Apps["Claude Desktop / ChatGPT app"] -. "sem acesso" .- Vault
@@ -68,8 +67,8 @@ flowchart TB
 | Motor `cofre/` | Lê/escreve notas, aplica as regras, monta o pacote de contexto, revisa e exporta. Python 3.9+ puro, roda em Windows, Linux, macOS e WSL. |
 | Servidor MCP | Interface dos agentes. Mesmo binário para Hermes, OpenCode, Claude Code e Codex. Descobre o workspace por `roots/list` quando o cliente oferece. |
 | Plugins | Injetam o contexto sem depender do modelo: no Hermes como seção do prompt de sistema (estável, sobrevive à compactação) mais uma âncora periódica; no OpenCode em toda chamada e no pedido de compactação. |
-| Protocolo | Texto único (`adapters/shared/PROTOCOLO-AGENTE.md`) instalado no `SOUL.md` do Hermes e no `AGENTS.md` global do OpenCode. |
-| Skills | Procedimentos detalhados carregados sob demanda (checkpoint, corrigir, revisar, NotebookLM). |
+| Protocolo | 9 regras curtas dentro do pacote de contexto que os plugins injetam; versão completa na skill `cofre-protocolo`; resumo nas instruções do servidor MCP (para clientes sem plugin). Nenhum arquivo de instruções do usuário é editado. |
+| Skills | Ficam no vault (`60-Skills/`, formato Agent Skills). Hermes lê e cria skills lá (`skills.create_dir`); OpenCode V2 lê pelo campo `skills`; no V1 o plugin copia para `~/.config/opencode/skills` ao iniciar. As do cofre ficam em `60-Skills/sistema/`. |
 
 ## Fluxos
 
@@ -103,7 +102,8 @@ flowchart TB
 | Arquivos Markdown, não banco vetorial | Você lê e corrige no Obsidian; git audita; zero infraestrutura | Busca é lexical (suficiente para o volume de um freelancer; dá para plugar embeddings depois) |
 | Python sem dependências | Funciona com o Python do Hermes e em qualquer SO, sem `pip install` | Parser YAML próprio (subconjunto usado pelo Obsidian) |
 | MCP como interface | Padrão suportado por Hermes, OpenCode, Claude Code e Codex; não toca apps de chat | Ferramentas consomem alguns milhares de tokens de schema |
-| Plugins além do protocolo | Modelos fracos esquecem de pedir contexto | Plugins acompanham a API de cada ferramenta (OpenCode V2 mudou a API; o plugin já suporta V1 e V2) |
+| Plugins em vez de `AGENTS.md`/`SOUL.md` | Arquivos de instrução grandes já não são lidos por inteiro; o plugin injeta só o necessário, e modelos fracos esquecem de pedir contexto | Depende da API de plugins de cada ferramenta (OpenCode V2 mudou a API; o plugin já suporta V1 e V2). Sem plugin, só as instruções do MCP chegam ao modelo |
+| Skills no vault | Uma fonte só, versionada com git, visível no Obsidian, compartilhada por Hermes e OpenCode | Skills que o Hermes aprende também caem no vault (com aprovação); bundled do Hermes com o mesmo nome têm precedência |
 | Evidência de arquivo conferida | Detecta trecho inventado, o erro mais comum de modelo fraco | Evidência de comando/URL não é reexecutada (seria arriscado); fica a cargo da revisão humana e da política `humano` |
 | Desligar `MEMORY.md` do Hermes | Elimina a segunda fonte de verdade que contaminava as sessões | O agente perde o "diário pessoal" nativo; o cofre substitui com regras melhores (reversível) |
 | Similaridade lexical para refutados/duplicatas | Sem dependências, previsível, explicável na mensagem de erro | Pode deixar passar paráfrases distantes ou acusar falsos positivos (agente pode usar `forcar` em casos não idênticos; você revisa) |

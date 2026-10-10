@@ -25,10 +25,11 @@ PASTAS = {
     "conhecimento": "30-Conhecimento",
     "clientes": "40-Clientes",
     "fontes": "50-Fontes",
+    "skills": "60-Skills",
     "arquivo": "90-Arquivo",
 }
 DIR_EXPORTACOES = f"{PASTAS['arquivo']}/Exportacoes-NotebookLM"
-DIRS_NAO_INDEXADOS = (DIR_EXPORTACOES, f"{PASTAS['sistema']}/Templates")
+DIRS_NAO_INDEXADOS = (DIR_EXPORTACOES, f"{PASTAS['sistema']}/Templates", PASTAS["skills"])
 IGNORAR_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".exportacoes"}
 
 STATUS_FATO = ("hipotese", "verificado", "contestado", "refutado", "obsoleto")

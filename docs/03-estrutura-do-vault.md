@@ -4,7 +4,7 @@
 
 | Pasta | Conteúdo | Quem escreve |
 | --- | --- | --- |
-| `00-Sistema/` | `Inicio` (painel), `LEIA-ME`, `Perfil`, `config`, `Protocolo das IAs`, `Paineis/*.base`, `Templates/`, `Relatorios/`, `Exemplos/` | Você (e o instalador) |
+| `00-Sistema/` | `Inicio` (painel), `LEIA-ME`, `Perfil`, `config`, `Paineis/*.base`, `Templates/`, `Relatorios/`, `Exemplos/` | Você |
 | `01-Inbox/` | Capturas brutas `C-XXXXX` | Agentes e você; você tria |
 | `02-Sessoes/` | Sessões sem projeto `S-XXXXX` | Agentes |
 | `10-Projetos/<slug>/` | `<slug>.md` (hub), `<slug> - Estado.md`, `Fatos/`, `Decisoes/`, `Sessoes/` | Agentes (via MCP) e você |
@@ -12,6 +12,7 @@
 | `30-Conhecimento/` | `Fatos/` e `Decisoes/` globais (máquina, ferramentas, conhecimento geral) | Agentes e você |
 | `40-Clientes/` | Hub por cliente (modelo `Cliente`) | Você |
 | `50-Fontes/` | Material externo; `NotebookLM/` com respostas importadas `N-XXXXX` | Você e agentes |
+| `60-Skills/` | Skills no formato Agent Skills (`<categoria>/<skill>/SKILL.md`); `sistema/` tem as do cofre | Você, o instalador (`sistema/`) e o Hermes ao aprender skills (com sua aprovação) |
 | `90-Arquivo/` | Projetos encerrados; `Exportacoes-NotebookLM/` (não indexado) | Você / `cofre exportar-notebooklm` |
 
 Nomes de pasta são ASCII de propósito: agentes e shells de Windows lidam mal com acentos em caminhos. Títulos de notas podem ter acento.
@@ -59,6 +60,18 @@ Um por projeto. `atualizado`, `atualizado_por`, `ultima_sessao`. Corpo: Foco atu
 ### Outras
 `captura` (inbox, `status: pendente`), `fonte` (`origem`, `confiabilidade`), `perfil`, `config`. Notas sem `tipo` (como os `LEIA-ME`) são ignoradas pelo motor.
 
+## Skills (`60-Skills/`)
+
+Cada skill é uma pasta com `SKILL.md` (frontmatter `name`, igual ao nome da pasta, e `description`) e, se precisar, `references/` e `scripts/`. Uma pasta de categoria no meio é opcional. O motor não indexa essas pastas como notas; elas são lidas pelos agentes:
+
+| Agente | Como lê |
+| --- | --- |
+| Hermes | `skills.create_dir` = `60-Skills` (lê tudo e cria as skills novas aqui) |
+| OpenCode V2 | `"skills": ["<vault>/60-Skills"]` no `opencode.json` |
+| OpenCode V1 | Cópia achatada em `~/.config/opencode/skills/<id>/` feita pelo plugin a cada início (marcada com `.cofre-sync`; skills suas nessa pasta não são tocadas) |
+
+Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincronizar`. O painel `Skills.base` lista todas.
+
 ## Painéis (Bases)
 
 Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.base` ficam em `00-Sistema/Paineis/` e excluem `00-Sistema/` dos resultados globais.
@@ -72,6 +85,7 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | `Missoes.base` | Quadro (kanban por status), Tabela |
 | `Sessoes.base` | Recentes (14 dias), Todas |
 | `Inbox.base` | Capturas pendentes |
+| `Skills.base` | Skills em `60-Skills` (nome, quando usar, pasta) |
 
 `00-Sistema/Inicio.md` junta as visões que pedem ação sua. Ordenação pode ser ajustada pelo menu Sort de cada visão (fica salva no `.base`).
 

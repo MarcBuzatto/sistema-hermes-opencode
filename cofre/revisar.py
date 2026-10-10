@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from . import epistemica as ep
+from . import skills as skills_mod
 from .contexto import vencido
 from .projetos import bases_de_arquivos
 from .registrar import Autor, _corpo_fato, _linha_hist
@@ -115,6 +116,8 @@ def revisar(cofre: Cofre, projeto: str | None = None, conferir_evidencias: bool 
             achados.append(Achado("erro", _rotulo(n), f"status de missão inválido '{n.status}'"))
         if n.tipo == "captura" and n.status == "pendente":
             achados.append(Achado("info", _rotulo(n), f"captura pendente de triagem na inbox: {n.caminho.stem}"))
+    if not projeto:
+        achados += [Achado(g, n, m) for g, n, m in skills_mod.verificar(cofre.raiz)]
     achados.sort(key=lambda a: (GRAVIDADE.get(a.gravidade, 9), a.nota))
     return achados
 

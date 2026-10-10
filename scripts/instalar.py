@@ -3,7 +3,12 @@
 
 Instala o pacote, cria/completa o vault e liga o cofre SOMENTE nos agentes de
 terminal (Hermes, OpenCode e, se pedido, Claude Code CLI e Codex CLI). Os apps de
-chat (Claude Desktop, ChatGPT) não são tocados: nenhum arquivo deles é alterado.
+chat (Claude Desktop, ChatGPT) não são tocados.
+
+Nenhum arquivo de instruções é editado (AGENTS.md, SOUL.md, CLAUDE.md): o protocolo
+chega aos modelos pelos plugins (prompt de sistema), pelas instruções do servidor MCP
+e pela skill cofre-protocolo. Blocos deixados por versões antigas do instalador são
+removidos.
 
 Uso:
   python scripts/instalar.py --vault ~/Obsidian/Cofre --git
@@ -53,7 +58,7 @@ class Instalador:
         self.launcher = self.bin_dir / ("cofre.cmd" if WIN else "cofre")
         self.opencode_dir = Path(os.environ.get("OPENCODE_CONFIG_DIR") or Path.home() / ".config" / "opencode")
         self.hermes_home = _hermes_home()
-        self.skills_dir = Path.home() / ".agents" / "skills"
+        self.skills_legado = Path.home() / ".agents" / "skills"
         self.vault: Path | None = None
 
     # ---- utilidades ------------------------------------------------------
@@ -98,7 +103,7 @@ class Instalador:
         if self.seco:
             return None
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         except (OSError, subprocess.SubprocessError) as e:
             self.pendencias.append(f"Falhou ({e}): {' '.join(cmd)}")
             return None
@@ -106,11 +111,22 @@ class Instalador:
             self.pendencias.append(f"Falhou ({(r.stderr or r.stdout).strip()[:200]}): {' '.join(cmd)}")
         return r
 
-    def protocolo(self, extra: Path | None) -> str:
-        texto = (RAIZ / "adapters" / "shared" / "PROTOCOLO-AGENTE.md").read_text(encoding="utf-8").strip()
-        if extra and extra.exists():
-            texto += "\n\n" + extra.read_text(encoding="utf-8").strip()
-        return texto + f"\n\nVault do cofre: `{self.vault}`"
+    def limpar_blocos_legados(self) -> None:
+        """Remove blocos que versões antigas do instalador puseram em arquivos de instrução."""
+        codex = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+        for arquivo in (self.opencode_dir / "AGENTS.md", self.hermes_home / "SOUL.md",
+                        Path.home() / ".claude" / "CLAUDE.md", codex / "AGENTS.md"):
+            if arquivo.exists() and INICIO in arquivo.read_text(encoding="utf-8", errors="replace"):
+                self.bloco(arquivo, None)
+        if self.skills_legado.is_dir():
+            for pasta in self.skills_legado.glob("cofre-*"):
+                self.info(f"remover {pasta} (local antigo das skills do cofre)")
+                if not self.seco:
+                    shutil.rmtree(pasta, ignore_errors=True)
+
+    @property
+    def pasta_skills(self) -> Path:
+        return (self.vault or Path(".")) / "60-Skills"
 
     def cmd_cofre(self) -> str:
         caminhos = [p.rstrip("/\\") for p in os.environ.get("PATH", "").split(os.pathsep)]
@@ -165,10 +181,9 @@ class Instalador:
 
             cofre_main(["init", str(self.vault)])
             gravar_config_usuario({"vault": str(self.vault), "python": str(self.python), "app": str(self.app)})
-        protocolo = (RAIZ / "adapters" / "shared" / "PROTOCOLO-AGENTE.md").read_text(encoding="utf-8")
-        self.escrever(self.vault / "00-Sistema" / "Protocolo das IAs.md",
-                      "> [!info] Texto exato que as IAs recebem. Gerado pelo instalador; edite em "
-                      "adapters/shared/PROTOCOLO-AGENTE.md no repositório e reinstale.\n\n" + protocolo)
+        for pasta in sorted((RAIZ / "adapters" / "shared" / "skills").iterdir()):
+            self.escrever(self.pasta_skills / "sistema" / pasta.name / "SKILL.md",
+                          (pasta / "SKILL.md").read_text(encoding="utf-8"))
         if self.a.git and not (self.vault / ".git").exists():
             for cmd in (["git", "-C", str(self.vault), "init", "-q"],
                         ["git", "-C", str(self.vault), "add", "-A"],
@@ -176,25 +191,13 @@ class Instalador:
                          "commit", "-qm", "cofre: vault inicial"]):
                 self.rodar(cmd, "git")
 
-    # ---- skills ----------------------------------------------------------
-    def instalar_skills(self, remover: bool = False) -> None:
-        for pasta in sorted((RAIZ / "adapters" / "shared" / "skills").iterdir()):
-            destino = self.skills_dir / pasta.name
-            if remover:
-                if destino.exists():
-                    self.info(f"remover {destino}")
-                    if not self.seco:
-                        shutil.rmtree(destino)
-                continue
-            self.escrever(destino / "SKILL.md", (pasta / "SKILL.md").read_text(encoding="utf-8"))
-
     # ---- OpenCode --------------------------------------------------------
     def versao_opencode(self) -> int | None:
         exe = shutil.which("opencode")
         if not exe:
             return None
         try:
-            saida = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=20).stdout
+            saida = subprocess.run([exe, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20).stdout
         except (OSError, subprocess.SubprocessError):
             return None
         m = re.search(r"(\d+)\.(\d+)\.(\d+)", saida or "")
@@ -204,8 +207,8 @@ class Instalador:
         if not remover and not (shutil.which("opencode") or self.opencode_dir.exists() or self.a.opencode):
             self.aviso("OpenCode não encontrado; pulei (use --opencode para forçar).")
             return
-        self.bloco(self.opencode_dir / "AGENTS.md",
-                   None if remover else self.protocolo(RAIZ / "adapters" / "opencode" / "AGENTS.extra.md"))
+        versao = self.versao_opencode()
+        destino_sync = None if (versao and versao >= 2) else self.opencode_dir / "skills"
         for arq in sorted((RAIZ / "adapters" / "opencode" / "commands").glob("*.md")):
             destino = self.opencode_dir / "commands" / arq.name
             existente = destino.read_text(encoding="utf-8") if destino.exists() else ""
@@ -228,25 +231,31 @@ class Instalador:
         else:
             texto = (RAIZ / "adapters" / "opencode" / "plugins" / "cofre.js").read_text(encoding="utf-8")
             texto = texto.replace("{{PYTHON}}", json.dumps(str(self.python))[1:-1]).replace(
-                "{{APP}}", json.dumps(str(self.app))[1:-1])
+                "{{APP}}", json.dumps(str(self.app))[1:-1]).replace(
+                "{{DESTINO_SKILLS}}", json.dumps(str(destino_sync)) if destino_sync else "null")
             self.escrever(plugin, texto)
-        self._opencode_mcp(remover)
+        self._opencode_config(remover, versao)
+        if destino_sync and self.vault:
+            argumentos = ["skills", "sincronizar", "--destino", str(destino_sync)] + (["--remover"] if remover else [])
+            self.rodar([str(self.python), str(self.app), *argumentos], "skills do vault -> OpenCode V1")
 
-    def _opencode_mcp(self, remover: bool) -> None:
+    def _opencode_config(self, remover: bool, versao: int | None) -> None:
         jsonc = self.opencode_dir / "opencode.jsonc"
         arq = self.opencode_dir / "opencode.json"
-        versao = self.versao_opencode()
         if versao and versao >= 2:
             entrada = {"type": "local", "command": self.mcp_comando(),
                        "environment": {"COFRE_AGENTE": "opencode"}, "codemode": False}
         else:
             entrada = {"type": "local", "command": self.mcp_comando(),
                        "environment": {"COFRE_AGENTE": "opencode"}, "enabled": True}
+        v2 = bool(versao and versao >= 2)
+        pasta_skills = str(self.pasta_skills)
         if jsonc.exists() and not arq.exists():
-            caminho_json = "mcp.servers.cofre" if versao and versao >= 2 else "mcp.cofre"
+            caminho_json = "mcp.servers.cofre" if v2 else "mcp.cofre"
             if not remover:
+                extra = f'\ne em "skills": ["{pasta_skills}"]' if v2 else ""
                 self.pendencias.append(
-                    f"Edite {jsonc} e adicione em {caminho_json}:\n{json.dumps(entrada, indent=2, ensure_ascii=False)}")
+                    f"Edite {jsonc} e adicione em {caminho_json}:\n{json.dumps(entrada, indent=2, ensure_ascii=False)}{extra}")
             return
         try:
             cfg = json.loads(arq.read_text(encoding="utf-8")) if arq.exists() else {"$schema": "https://opencode.ai/config.json"}
@@ -270,6 +279,15 @@ class Instalador:
             del mcp["servers"]
         if not mcp:
             cfg.pop("mcp", None)
+        if isinstance(cfg.get("skills"), list) or v2:
+            atuais = [x for x in cfg.get("skills") or [] if x != pasta_skills]
+            novos = atuais if (remover or not v2) else atuais + [pasta_skills]
+            if novos != (cfg.get("skills") or []):
+                mudou = True
+            if novos:
+                cfg["skills"] = novos
+            else:
+                cfg.pop("skills", None)
         if mudou:
             self.backup(arq)
             self.escrever(arq, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
@@ -283,8 +301,6 @@ class Instalador:
         if not remover and not (exe or self.hermes_home.exists() or self.a.hermes):
             self.aviso("Hermes não encontrado; pulei (use --hermes para forçar).")
             return
-        self.bloco(self.hermes_home / "SOUL.md",
-                   None if remover else self.protocolo(RAIZ / "adapters" / "hermes" / "SOUL.extra.md"))
         destino_plugin = self.hermes_home / "plugins" / "cofre"
         if remover:
             if destino_plugin.exists():
@@ -310,14 +326,16 @@ class Instalador:
 
     def _instrucoes_hermes_manual(self, remover: bool) -> str:
         if remover:
-            return ("Comando `hermes` não está no PATH. Depois rode `hermes config unset mcp_servers.cofre` e remova "
-                    "'cofre' de plugins.enabled (mantendo os outros itens).")
+            return ("Comando `hermes` não está no PATH. Depois rode `hermes config unset mcp_servers.cofre`, "
+                    "`hermes config unset skills.create_dir` (se apontar para o vault) e remova 'cofre' de "
+                    "plugins.enabled (mantendo os outros itens).")
         servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
                     "env": {"COFRE_AGENTE": "hermes"}, "timeout": 60}
-        listas = ["'cofre' em plugins.enabled", "'~/.agents/skills' em skills.external_dirs"]
+        listas = ["'cofre' em plugins.enabled"]
         if not self.a.manter_skill_obsidian:
             listas.append("'obsidian' em skills.disabled")
-        escalares = ["hermes config set skills.write_approval true", "hermes config set memory.write_approval true"]
+        escalares = [f"hermes config set skills.create_dir {_citar(str(self.pasta_skills))}",
+                     "hermes config set skills.write_approval true", "hermes config set memory.write_approval true"]
         if not self.a.manter_memoria_hermes:
             escalares.append("hermes config set memory.memory_enabled false")
         return (
@@ -328,17 +346,22 @@ class Instalador:
             "Ou rode o instalador de novo depois que o `hermes` estiver no PATH."
         )
 
-    def _lista_hermes(self, chave: str) -> list:
+    def _valor_hermes(self, chave: str):
         exe = shutil.which("hermes")
         if not exe or self.seco:
-            return []
+            return None
         try:
-            r = subprocess.run([exe, "config", "get", chave, "--json"], capture_output=True, text=True, timeout=30)
+            r = subprocess.run([exe, "config", "get", chave, "--json"], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=30)
             valor = json.loads(r.stdout.strip() or "null") if r.returncode == 0 else None
         except (OSError, subprocess.SubprocessError, ValueError):
             valor = None
         if isinstance(valor, dict) and "value" in valor:
             valor = valor["value"]
+        return valor
+
+    def _lista_hermes(self, chave: str) -> list:
+        valor = self._valor_hermes(chave)
         return list(valor) if isinstance(valor, list) else []
 
     def _comandos_hermes(self, remover: bool) -> list[list[str]]:
@@ -347,17 +370,30 @@ class Instalador:
             novo = atual if remover else atual + [item]
             return ["config", "set", chave, json.dumps(novo)]
 
+        nossa = str(self.pasta_skills)
+        atual = self._valor_hermes("skills.create_dir")
+        atual = str(atual) if atual else ""
         if remover:
-            return [["config", "unset", "mcp_servers.cofre"], mesclar("plugins.enabled", "cofre")]
+            cmds = [["config", "unset", "mcp_servers.cofre"], mesclar("plugins.enabled", "cofre")]
+            if atual and self.vault and Path(os.path.expanduser(atual)) == self.pasta_skills:
+                cmds.append(["config", "unset", "skills.create_dir"])
+            elif nossa in self._lista_hermes("skills.external_dirs"):
+                cmds.append(mesclar("skills.external_dirs", nossa))
+            return cmds
         servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
                     "env": {"COFRE_AGENTE": "hermes"}, "timeout": 60}
         cmds = [
             ["config", "set", "mcp_servers.cofre", json.dumps(servidor)],
             mesclar("plugins.enabled", "cofre"),
-            mesclar("skills.external_dirs", "~/.agents/skills"),
             ["config", "set", "skills.write_approval", "true"],
             ["config", "set", "memory.write_approval", "true"],
         ]
+        local = self.hermes_home / "skills"
+        if not atual or Path(os.path.expanduser(atual)) in (self.pasta_skills, local):
+            cmds.append(["config", "set", "skills.create_dir", nossa])
+        else:
+            self.aviso(f"skills.create_dir do Hermes já aponta para {atual}; mantive e adicionei o vault em external_dirs.")
+            cmds.append(mesclar("skills.external_dirs", nossa))
         if not self.a.manter_skill_obsidian:
             cmds.append(mesclar("skills.disabled", "obsidian"))
         if not self.a.manter_memoria_hermes:
@@ -366,8 +402,6 @@ class Instalador:
 
     # ---- opcionais: Claude Code CLI e Codex CLI -----------------------------
     def claude_code(self, remover: bool = False) -> None:
-        self.bloco(Path.home() / ".claude" / "CLAUDE.md",
-                   None if remover else self.protocolo(RAIZ / "adapters" / "claude-code" / "CLAUDE.extra.md"))
         exe = shutil.which("claude")
         if remover:
             cmd = ["mcp", "remove", "-s", "user", "cofre"]
@@ -380,8 +414,6 @@ class Instalador:
 
     def codex(self, remover: bool = False) -> None:
         pasta = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
-        self.bloco(pasta / "AGENTS.md",
-                   None if remover else self.protocolo(RAIZ / "adapters" / "codex" / "AGENTS.extra.md"))
         cfg = pasta / "config.toml"
         atual = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
         padrao = re.compile(r"\n?# cofre:inicio\n.*?# cofre:fim\n", re.S)
@@ -405,7 +437,7 @@ class Instalador:
     def instalar(self) -> None:
         self.instalar_pacote()
         self.preparar_vault()
-        self.instalar_skills()
+        self.limpar_blocos_legados()
         if not self.a.sem_opencode:
             self.opencode()
         if not self.a.sem_hermes:
@@ -417,13 +449,18 @@ class Instalador:
         self.resumo()
 
     def desinstalar(self) -> None:
+        sys.path.insert(0, str(RAIZ))
+        from cofre.config import ler_config_usuario
+
+        vault = ler_config_usuario().get("vault")
+        self.vault = Path(vault) if vault else None
+        self.limpar_blocos_legados()
         self.opencode(remover=True)
         self.hermes(remover=True)
-        if (Path.home() / ".claude" / "CLAUDE.md").exists():
+        if shutil.which("claude"):
             self.claude_code(remover=True)
-        if (Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "AGENTS.md").exists():
+        if (Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "config.toml").exists():
             self.codex(remover=True)
-        self.instalar_skills(remover=True)
         for alvo in (self.launcher, self.app):
             if alvo.exists():
                 self.info(f"remover {alvo}")
@@ -439,7 +476,7 @@ class Instalador:
         if not self.seco and not self.a.desinstalar:
             try:
                 saida = subprocess.run([str(self.python), str(self.app), "doctor"], capture_output=True, text=True,
-                                       timeout=60).stdout
+                                       encoding="utf-8", errors="replace", timeout=60).stdout
                 print(saida)
             except (OSError, subprocess.SubprocessError):
                 pass
@@ -474,6 +511,12 @@ def main() -> None:
     p.add_argument("--manter-skill-obsidian", action="store_true", help="Não desativa a skill nativa 'obsidian' do Hermes")
     p.add_argument("--sem-path", action="store_true", help="Windows: não mexe no PATH do usuário")
     a = p.parse_args()
+    for fluxo in (sys.stdout, sys.stderr):
+        if hasattr(fluxo, "reconfigure"):
+            try:
+                fluxo.reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
     if sys.version_info < (3, 9):
         raise SystemExit("Requer Python 3.9 ou mais novo.")
     inst = Instalador(a)

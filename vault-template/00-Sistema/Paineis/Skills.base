@@ -1,0 +1,16 @@
+filters:
+  and:
+    - file.inFolder("60-Skills")
+    - file.hasProperty("description")
+properties:
+  name:
+    displayName: Nome
+  description:
+    displayName: Quando usar
+views:
+  - type: table
+    name: Skills
+    order:
+      - name
+      - description
+      - file.folder

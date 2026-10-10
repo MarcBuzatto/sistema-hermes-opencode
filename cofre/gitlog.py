@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def _git(raiz: Path, *args: str, timeout: int = 15) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(raiz), *args], capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(["git", "-C", str(raiz), *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 def commit(raiz: Path, caminhos: list[Path], mensagem: str, habilitado: bool = True) -> bool:

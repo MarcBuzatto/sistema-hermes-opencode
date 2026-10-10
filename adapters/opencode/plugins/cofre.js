@@ -6,6 +6,7 @@ import { execFile } from "node:child_process"
 
 const PYTHON = "{{PYTHON}}"
 const APP = "{{APP}}"
+const DESTINO_SKILLS = {{DESTINO_SKILLS}}
 const TTL_MS = 30_000
 const cacheContexto = new Map()
 const cacheDiretorio = new Map()
@@ -63,6 +64,8 @@ export default {
     })
   },
   async server(input) {
+    // OpenCode V1 só enxerga ~/.config/opencode/skills/*/SKILL.md: copia as skills do vault ao iniciar.
+    if (DESTINO_SKILLS) rodar(["skills", "sincronizar", "--destino", DESTINO_SKILLS])
     const dir = input?.directory || input?.worktree
     return {
       "experimental.chat.system.transform": async (_entrada, saida) => {

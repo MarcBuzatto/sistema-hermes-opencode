@@ -50,7 +50,7 @@ def remoto_git(cwd: str) -> str | None:
     try:
         saida = subprocess.run(
             ["git", "-C", str(cwd), "config", "--get", "remote.origin.url"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3,
         )
     except (OSError, subprocess.SubprocessError):
         return None
