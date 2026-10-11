@@ -1,14 +1,21 @@
 filters:
   and:
-    - 'tipo == "captura"'
-    - 'status == "pendente"'
-    - not:
-        - file.inFolder("00-Sistema")
+    - file.inFolder("01-Inbox")
 views:
   - type: table
     name: Para triar
+    filters:
+      and:
+        - 'tipo == "captura"'
+        - 'status == "pendente"'
     order:
       - file.name
       - projeto
       - origem
       - capturado_em
+  - type: table
+    name: Tudo na inbox
+    order:
+      - file.name
+      - file.ctime
+      - tipo

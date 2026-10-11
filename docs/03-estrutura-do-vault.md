@@ -13,7 +13,9 @@
 | `40-Clientes/` | Hub por cliente (modelo `Cliente`) | Você |
 | `50-Fontes/` | Material externo; `NotebookLM/` com respostas importadas `N-XXXXX` | Você e agentes |
 | `60-Skills/` | Skills no formato Agent Skills (`<categoria>/<skill>/SKILL.md`); `sistema/` tem as do cofre | Você, o instalador (`sistema/`) e o Hermes ao aprender skills (com sua aprovação) |
+| `80-Anexos/` | Imagens, PDFs e outros binários (o Obsidian salva aqui o que você cola) | Você |
 | `90-Arquivo/` | Projetos encerrados; `Exportacoes-NotebookLM/` (não indexado) | Você / `cofre exportar-notebooklm` |
+| `99-Privado/` | O que nenhuma IA deve receber pelo cofre; fora do git do vault | Você |
 
 Nomes de pasta são ASCII de propósito: agentes e shells de Windows lidam mal com acentos em caminhos. Títulos de notas podem ter acento.
 
@@ -83,7 +85,7 @@ Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincron
 
 ## Notas livres e busca por relevância
 
-### Como escrever notas que a IA acha (resumo da sua pesquisa, respostas 1 a 4)
+### Como escrever notas que a IA acha (resumo da sua pesquisa)
 
 - **Título**: uma frase que diz a ideia ("Tailwind liga o tema escuro pela classe dark"), sem ID no nome. Atalhos e siglas vão em `aliases`, que a busca também usa.
 - **`description`**: uma linha dizendo do que a nota trata. É ela que a IA recebe como resumo do ponteiro, em vez da primeira linha do texto. `description` é uma propriedade que o próprio Obsidian reconhece; `resumo` também funciona.
@@ -92,6 +94,11 @@ Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincron
 - **Propriedades**: nomes minúsculos sem espaço (`quando_usar`), sempre do mesmo tipo em todo o vault, sem YAML aninhado e com links entre aspas (`projeto: "[[loja]]"`).
 - **Arquivo morto**: o que está em `90-Arquivo/` não entra na busca automática por mensagem, mas `cofre_buscar` ainda encontra.
 - **Renomear e mover**: faça no Obsidian, que atualiza os links. Pelo terminal (`mv`) os links quebram.
+- **Um assunto por nota** (algumas centenas de palavras), com pelo menos um `[[link]]` para outra nota ou para o MOC do tema. Nota longa não é proibida (fichamento, relatório), mas ponha títulos `##`: `cofre_ler` de nota com mais de `ler_max_chars` (6000 caracteres) devolve o começo e a lista de seções, e a IA pede só a seção útil (`secao='Etapa 3'`). Sem títulos, ela só consegue ler inteira.
+- **Inbox**: capture sem formatar e trie depois de um ou dois dias; o que sobrar vira nota em `30-Conhecimento/` reescrita com as suas palavras.
+- **Anexos**: PDF/imagem não é lido pela IA. Crie uma fonte em `50-Fontes/` (template Fonte) com `anexo: "[[arquivo.pdf]]"`, `description` e os trechos importantes em texto.
+
+O `cofre revisar` aponta o que foge disso: notas sem nenhum link, temas com 3 ou mais notas sem MOC, notas muito longas ou longas sem títulos e itens parados na inbox.
 
 As notas que o cofre cria (fatos, decisões, specs) continuam com o ID no nome (`F-7K3PQ ...`). Os agentes citam esses IDs, e eles garantem nome único quando um fato refutado e a correção dele têm textos parecidos. Você vê essas notas pelos painéis, que mostram a afirmação e não o nome do arquivo.
 
@@ -105,7 +112,7 @@ O índice fica em `.cofre/indice.json` (pasta oculta, ignorada pelo Obsidian e p
 
 ## Painéis (Bases)
 
-Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.base` ficam em `00-Sistema/Paineis/` e excluem `00-Sistema/` dos resultados globais.
+Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.base` ficam em `00-Sistema/Paineis/` e excluem `00-Sistema/` dos resultados globais. Todas começam com um filtro por `tipo` ou pasta, para não varrer o vault inteiro quando ele crescer.
 
 | Base | Visões |
 | --- | --- |
@@ -117,18 +124,38 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | `Specs.base` | Quadro (kanban por status: rascunho, aprovada, em execução, concluída), Tabela |
 | `Recursos.base` | Sites, APIs e ferramentas externas (título, quando usar, url) |
 | `Sessoes.base` | Recentes (14 dias), Todas |
-| `Inbox.base` | Capturas pendentes |
-| `Skills.base` | Skills em `60-Skills` (nome, quando usar, pasta) |
+| `Inbox.base` | Para triar (capturas das IAs), Tudo na inbox (inclui as suas) |
+| `Skills.base` | Skills em `60-Skills` (nome, status, quando usar, fontes, pasta) |
 
 `00-Sistema/Inicio.md` junta as visões que pedem ação sua. Ordenação pode ser ajustada pelo menu Sort de cada visão (fica salva no `.base`).
 
 ## Configuração do vault
 
-`00-Sistema/config.md` (propriedades editáveis pelo Obsidian): `politica_verificacao`, `validade_padrao_dias`, `hipotese_antiga_dias`, `ancora_a_cada_turnos`, `lembrar_checkpoint_apos_turnos`, `git_autocommit`, `contexto_max_chars`, `contexto_sistema_max_chars`, `fatos_verificados_no_contexto`. A própria nota explica cada uma.
+`00-Sistema/config.md` (propriedades editáveis pelo Obsidian): `politica_verificacao`, `validade_padrao_dias`, `hipotese_antiga_dias`, `ancora_a_cada_turnos`, `lembrar_checkpoint_apos_turnos`, `git_autocommit`, `contexto_max_chars`, `contexto_sistema_max_chars`, `fatos_verificados_no_contexto`, `ler_max_chars`, `pastas_privadas` e as de relevância e specs. A própria nota explica cada uma.
+
+## Pasta privada e dados sensíveis
+
+`99-Privado/` (e as pastas listadas em `pastas_privadas` no `config.md`) é para o que você quer no Obsidian mas não quer entregar a nenhuma IA: dados de clientes, contratos, anotações pessoais.
+
+| Camada | O que acontece |
+| --- | --- |
+| Cofre (Hermes e OpenCode) | Fora do índice, da busca, do bloco de relevância, do contexto, da revisão e da exportação para o NotebookLM. `cofre_ler` recusa o caminho. |
+| Plugin do OpenCode (hooks V1) | Bloqueia `read`, `edit`, `glob`, `grep`, `list`, `bash` e demais ferramentas cujos argumentos apontem para a pasta; tira as linhas com o caminho dela da saída de `glob`/`grep`/`list`/`bash`. |
+| Git do vault | `99-Privado/` está no `.gitignore` do template (`cofre init` acrescenta a linha em vaults antigos). O `cofre revisar` dá erro se uma pasta privada estiver versionada ou fora do `.gitignore`. |
+| Hermes | O plugin não bloqueia ferramentas de arquivo/terminal; vale a exclusão do cofre e a regra no protocolo. |
+
+Não é criptografia: um agente com terminal livre ainda pode ler o disco por caminhos que nenhuma regra prevê. Senhas, tokens e chaves não ficam nem aqui: use um gerenciador de senhas e registre no vault só onde a credencial fica (o cofre bloqueia credenciais nas escritas e o `cofre revisar` procura nas notas).
+
+Sincronização e backup (da sua pesquisa, resposta 13; confirme preços e recursos atuais nos sites oficiais):
+
+- **Obsidian Sync** tem criptografia ponta a ponta e permite excluir pastas da sincronização (deixe `99-Privado/` fora dos dispositivos móveis se quiser).
+- **Git** é texto puro: o `.gitignore` resolve as pastas privadas; para um remoto no GitHub/GitLab, repositório privado e, se precisar, `git-crypt`.
+- **iCloud/Drive/Dropbox** sincronizando o vault em tempo real: evite (conflitos, arquivos descarregados, sem criptografia por arquivo).
+- **Sincronizar não é backup**: apagou num lugar, apaga em todos. Tenha uma cópia versionada fora da máquina, por exemplo `rclone` com remoto `crypt` (cifra conteúdo e nomes) e `--backup-dir` para guardar versões alteradas ou apagadas.
 
 ## Git no vault
 
-Recomendado (`--git` no instalador). Com `git_autocommit: true`, cada escrita de agente vira um commit `cofre: fato F-XXXXX (verificado) por opencode/glm-4.6`. Para desfazer o que um agente gravou: `git log` e `git revert <commit>`. O `.gitignore` do template ignora `workspace*.json` do Obsidian, a lixeira, o lock e as exportações.
+Recomendado (`--git` no instalador). Com `git_autocommit: true`, cada escrita de agente vira um commit `cofre: fato F-XXXXX (verificado) por opencode/glm-4.6`; o commit inclui só os arquivos que o cofre gravou (anexos e notas suas entram quando você mesmo commitar). Para desfazer o que um agente gravou: `git log` e `git revert <commit>`. O `.gitignore` do template ignora `workspace*.json` do Obsidian, a lixeira, o lock, as exportações e `99-Privado/`.
 
 Evite deixar o vault dentro do OneDrive/iCloud sincronizando em tempo real: conflitos de sincronização e latência de leitura atrapalham agentes. Prefira git (ou Obsidian Sync) para levar o vault a outra máquina.
 

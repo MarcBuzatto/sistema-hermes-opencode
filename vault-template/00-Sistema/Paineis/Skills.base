@@ -7,10 +7,16 @@ properties:
     displayName: Nome
   description:
     displayName: Quando usar
+  status:
+    displayName: Status
+  fontes:
+    displayName: Fontes
 views:
   - type: table
     name: Skills
     order:
       - name
+      - status
       - description
+      - fontes
       - file.folder

@@ -155,6 +155,11 @@ class TestPluginOpenCode(PluginTeste):
         self.assertIn("Trabalhe SÓ em T1", res["apos_tarefa"], "chamada nova ao cofre invalida o cache")
         self.assertIn("MODO SPEC", res["v1_spec"])
         self.assertIn("contexto do projeto: Loja", res["v1_compactacao"])
+        self.assertTrue(res["privado_abs"])
+        self.assertTrue(res["privado_comando"])
+        self.assertFalse(res["vault_normal"])
+        self.assertFalse(res["outro_projeto"], "nome relativo fora do vault não bloqueia outros projetos")
+        self.assertEqual(res["grep_filtrado"], "30-Conhecimento/a.md:1:x")
 
 
 _ROTEIRO = r"""
@@ -190,6 +195,17 @@ r.v1_spec = sys1.system.join("\n---\n")
 const comp = { context: [] }
 await v1["experimental.session.compacting"]({}, comp)
 r.v1_compactacao = comp.context.join("\n")
+const vault = process.env.COFRE_VAULT
+const bloqueia = async (tool, args) => {
+  try { await v1["tool.execute.before"]({ tool }, { args }); return false } catch { return true }
+}
+r.privado_abs = await bloqueia("read", { filePath: vault + "/99-Privado/contrato.md" })
+r.privado_comando = await bloqueia("bash", { command: `cat "${vault}/99-Privado/contrato.md"` })
+r.vault_normal = await bloqueia("read", { filePath: vault + "/30-Conhecimento/LEIA-ME.md" })
+r.outro_projeto = await bloqueia("bash", { command: "ls 99-Privado" })
+const saida = { output: `30-Conhecimento/a.md:1:x\n${vault}/99-Privado/contrato.md:1:multa` }
+await v1["tool.execute.after"]({ tool: "grep" }, saida)
+r.grep_filtrado = saida.output
 console.log(JSON.stringify(r))
 """
 

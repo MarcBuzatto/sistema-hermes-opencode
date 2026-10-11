@@ -1,6 +1,6 @@
 # NotebookLM
 
-> Status: versão inicial baseada no papel típico do NotebookLM e nos limites publicados. A sua pesquisa profunda sobre Obsidian + NotebookLM ainda não foi incorporada; coloque-a em [`docs/pesquisa/`](pesquisa/LEIA-ME.md) e este documento (e o fluxo de exportação) serão revisados com base nela.
+> Status: revisado com a sua pesquisa ([`docs/pesquisa/respostas-notebooklm.md`](pesquisa/respostas-notebooklm.md), resposta 10 para o fluxo pesquisa -> skill). Limites do NotebookLM mudam: confirme na ajuda oficial.
 
 ## Papel de cada ferramenta
 
@@ -52,9 +52,22 @@ Cria `50-Fontes/NotebookLM/N-XXXXX <data> <título>.md`. Depois, para cada afirm
 
 O NotebookLM de consumidor não tem API pública oficial; as integrações "MCP para NotebookLM" que circulam usam automação de navegador sobre a sua conta, o que é frágil e pode violar os termos de uso. Existe API no NotebookLM Enterprise (Google Cloud), que faria sentido se você tiver esse plano. Por isso o fluxo aqui é manual e controlado: exportação gerada pelo cofre, importação explícita.
 
-## Pendências para quando a pesquisa chegar
+## Pesquisa -> conhecimento validado -> skill
 
-- **Pesquisa do NotebookLM -> skill em `60-Skills/`**: você já cria skills a partir de pesquisas do NotebookLM; o formato (estrutura do `SKILL.md`, o que vai para `references/`, como registrar a fonte e o status de validação da skill) será definido a partir da sua pesquisa.
+Separação que a sua pesquisa recomenda (literatura vs. conclusões testadas), no formato do cofre:
+
+| Etapa | Onde fica | Status |
+| --- | --- | --- |
+| Pesquisa bruta (resposta do NotebookLM, guia, artigo) | `50-Fontes/` (`tipo: fonte`, `N-XXXXX`), reflete a visão da fonte | Referência, nunca fato |
+| Cada afirmação útil | Fato `F-XXXXX` com evidência `nota :: N-XXXXX :: <trecho>` | `hipotese` |
+| Afirmação conferida (doc oficial, comando, código, você) | O mesmo fato, promovido com evidência `url`/`comando`/`arquivo`/`usuario` | `verificado` |
+| Procedimento reutilizável | Skill em `60-Skills/<categoria>/<nome>/SKILL.md` com `status` e `fontes` | `rascunho` até os passos principais terem bloco "Comprovado" |
+
+Na skill, cada passo separa o que foi testado (`> [!check] Comprovado`, citando o F-XXXXX) do que só a fonte diz (`> [!quote] Recomendação da fonte`, citando o N-XXXXX). Skill em `rascunho` aparece marcada no bloco de relevância e a IA avisa você antes de seguir; `cofre skills verificar` reclama de skill `verificada` sem `fontes`. O formato completo está em `60-Skills/LEIA-ME.md` e a IA o segue pela skill `cofre-notebooklm` ("transforma a pesquisa N-XXXXX numa skill").
+
+Material longo (fichamento, relatório) pode ficar inteiro na fonte: ponha títulos `##` e a IA lê só a seção que precisa (`cofre_ler` com `secao`).
+
+## Ainda em aberto
 
 - Ajustar a divisão em arquivos ao que funcionar melhor nas suas perguntas (por tema, por período, por cliente).
 - Avaliar formatos de saída do NotebookLM que valem guardar (guias de estudo, FAQ, linha do tempo, mapas mentais) e um modelo de nota para cada.

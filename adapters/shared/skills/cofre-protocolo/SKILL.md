@@ -59,9 +59,11 @@ A mensagem diz exatamente o que corrigir (trecho que não confere, afirmação j
 - Ausência no cofre não prova que algo é falso: verifique no código ou pergunte.
 - Nunca mova, renomeie ou apague notas do vault pelo terminal (`mv`, `rm`): isso quebra os `[[links]]` das outras notas. Renomear e mover é com o usuário, no Obsidian.
 - Linha "mapa do assunto: ..." no bloco de relevância = índice (MOC) do tema: abra ele primeiro e siga só os links que servirem.
+- Nunca abra nem procure arquivos em `99-Privado/` (ou outras pastas privadas do usuário), nem por terminal. Se o cofre ou o plugin bloquear um caminho, não tente outro: peça ao usuário.
+- `cofre_ler` de nota longa devolve o começo e a lista de seções: peça só a seção útil (`secao`), não a nota inteira.
 
 ## 8. Skills
-As skills do usuário ficam no vault em `60-Skills/` e aparecem para você como skills normais. Antes de seguir uma skill com status `rascunho` ou sem fonte, avise o usuário; ela pode conter informação não verificada.
+As skills do usuário ficam no vault em `60-Skills/` e aparecem para você como skills normais. Antes de seguir uma skill com `status: rascunho` ou sem `fontes`, avise o usuário; ela pode conter informação não verificada. Dentro da skill, bloco `[!check] Comprovado` foi testado; `[!quote] Recomendação da fonte` não foi. Criar skill a partir de pesquisa: skill `cofre-notebooklm`.
 
 ## 9. Specs (pedidos grandes)
 Pedido com várias etapas ou arquivos: siga a skill `cofre-sdd`. Em resumo: `cofre_spec` (requisitos QUANDO/DEVE, tarefas com comando de verificação), aprovação do usuário com as palavras dele, depois uma tarefa por vez com `cofre_tarefa`. Tarefa só termina com `cofre_tarefa(acao='concluir')`, que roda a verificação. Se houver linha **AGORA** no contexto, ela diz o que fazer agora.

@@ -26,4 +26,27 @@ Skills (habilidades) que as IAs carregam sob demanda. Ficam aqui, versionadas co
 
 `cofre skills listar` mostra o que existe; `cofre skills verificar` aponta problemas (description ausente, nome divergente da pasta, IDs repetidos, segredos).
 
-> Fluxo para criar skills a partir de pesquisas do NotebookLM: pendente da sua pesquisa (ver `docs/pesquisa/` no repositório).
+## Skill feita a partir de pesquisa
+
+A pesquisa entra primeiro como fonte (`cofre importar-notebooklm`, vira `N-XXXXX` em `50-Fontes/`). A skill aponta para ela e separa o que você testou do que só a fonte diz:
+
+```markdown
+---
+name: backup-rclone
+description: Backup do vault para nuvem com rclone crypt. Use ao configurar ou revisar o backup.
+status: rascunho          # rascunho | verificada | obsoleta
+fontes: [N-AB123]         # notas de fonte, fatos (F-...) ou links oficiais
+---
+# Backup com rclone
+
+1. Criar o remoto cifrado.
+   > [!check] Comprovado
+   > Testado em 2026-10-11: `rclone lsd cofre-cripto:` lista as pastas. (F-CD456)
+
+   > [!quote] Recomendação da fonte
+   > Usar `--backup-dir` para guardar versões apagadas. (N-AB123)
+```
+
+- `status: rascunho` faz a IA avisar você antes de seguir a skill (aparece marcado no bloco de relevância).
+- Mude para `verificada` quando os passos principais tiverem bloco "Comprovado"; `cofre skills verificar` reclama de skill verificada sem `fontes`.
+- Peça a uma IA "transforma a pesquisa N-AB123 numa skill": a skill `cofre-notebooklm` segue este formato.

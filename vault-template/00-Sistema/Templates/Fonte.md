@@ -3,7 +3,9 @@ tipo: fonte
 id: N-XXXXX
 origem: externa
 confiabilidade: a-avaliar
+description:
 url:
+anexo:
 projeto:
 importado_em: {{date}}
 aliases:

@@ -7,8 +7,12 @@
 // - Lembrete de checkpoint depois de N mensagens do usuário sem cofre_checkpoint.
 // - O contexto fica em cache por 30 s, mas é refeito quando aparece chamada nova a uma
 //   ferramenta do cofre (a linha AGORA da spec muda a cada tarefa).
+// - Pasta privada do vault (99-Privado e pastas_privadas): bloqueia ferramentas que apontem
+//   para ela e tira as linhas com o caminho dela da saída de glob/grep/list/bash (hooks V1).
 // Gerado pelo instalador do cofre.
 import { execFile } from "node:child_process"
+import { homedir } from "node:os"
+import { resolve as resolverCaminho } from "node:path"
 
 const PYTHON = "{{PYTHON}}"
 const APP = "{{APP}}"
@@ -35,6 +39,53 @@ function rodar(args, entrada) {
     )
     if (entrada !== undefined) filho.stdin?.end(entrada)
   })
+}
+
+const MSG_PRIVADO =
+  "Bloqueado pelo cofre: esse caminho fica numa pasta privada do usuário (99-Privado ou pastas_privadas do cofre). " +
+  "Não tente outro caminho nem outro comando; se precisar do conteúdo, peça ao usuário."
+const FERRAMENTAS_LISTAGEM = new Set(["glob", "grep", "list", "bash"])
+const normal = (s) => String(s).replace(/\\/g, "/").toLowerCase()
+
+function textosDe(valor, saida = []) {
+  if (typeof valor === "string") saida.push(valor)
+  else if (Array.isArray(valor)) valor.forEach((v) => textosDe(v, saida))
+  else if (valor && typeof valor === "object") Object.values(valor).forEach((v) => textosDe(v, saida))
+  return saida
+}
+
+// Caminhos privados vindos do cofre. Nome relativo (99-Privado) só conta quando o texto também
+// aponta para o vault ou a sessão roda dentro dele, para não bloquear nada em outros projetos.
+async function carregarPrivado(dir) {
+  try {
+    const d = JSON.parse((await rodar(["privado", "--json"])) || "{}")
+    const casa = normal(homedir())
+    const til = (p) => (casa && p.startsWith(casa + "/") ? "~" + p.slice(casa.length) : p)
+    const absolutas = (d.absolutas ?? []).map(normal).filter(Boolean)
+    const vault = normal(d.vault ?? "")
+    return {
+      absolutas: [...new Set([...absolutas, ...absolutas.map(til)])],
+      relativas: (d.relativas ?? []).map(normal).filter(Boolean),
+      vault: vault ? [...new Set([vault, til(vault)])] : [],
+      naVault: Boolean(vault) && (normal(dir ?? "") + "/").startsWith(vault + "/"),
+    }
+  } catch {
+    return null
+  }
+}
+
+function mencionaPrivado(texto, pv) {
+  const n = normal(texto)
+  if (pv.absolutas.some((p) => n.includes(p))) return true
+  return (pv.naVault || pv.vault.some((v) => n.includes(v))) && pv.relativas.some((p) => n.includes(p))
+}
+
+function tocaPrivado(args, pv, dir) {
+  return textosDe(args).some(
+    (t) =>
+      mencionaPrivado(t, pv) ||
+      (Boolean(dir) && t.length < 1000 && !t.includes("\n") && mencionaPrivado(resolverCaminho(dir, t), pv)),
+  )
 }
 
 const papel = (m) => m?.role ?? m?.info?.role
@@ -142,7 +193,20 @@ export default {
     // OpenCode V1 só enxerga ~/.config/opencode/skills/*/SKILL.md: copia as skills do vault ao iniciar.
     if (DESTINO_SKILLS) rodar(["skills", "sincronizar", "--destino", DESTINO_SKILLS])
     const dir = input?.directory || input?.worktree
+    const privado = carregarPrivado(dir)
     return {
+      "tool.execute.before": async (_entrada, saida) => {
+        const pv = await privado
+        if (pv && tocaPrivado(saida?.args, pv, dir)) throw new Error(MSG_PRIVADO)
+      },
+      "tool.execute.after": async (entrada, saida) => {
+        const pv = await privado
+        if (!pv || !FERRAMENTAS_LISTAGEM.has(String(entrada?.tool ?? "")) || typeof saida?.output !== "string") return
+        saida.output = saida.output
+          .split("\n")
+          .filter((ln) => !mencionaPrivado(ln, pv))
+          .join("\n")
+      },
       "experimental.chat.messages.transform": async (_entrada, saida) => {
         try {
           ultimoTextoV1 = textoDaUltimaMensagem(saida?.messages) || ultimoTextoV1

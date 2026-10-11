@@ -26,7 +26,9 @@ PASTAS = {
     "clientes": "40-Clientes",
     "fontes": "50-Fontes",
     "skills": "60-Skills",
+    "anexos": "80-Anexos",
     "arquivo": "90-Arquivo",
+    "privado": "99-Privado",
 }
 DIR_EXPORTACOES = f"{PASTAS['arquivo']}/Exportacoes-NotebookLM"
 DIRS_NAO_INDEXADOS = (DIR_EXPORTACOES, f"{PASTAS['sistema']}/Templates", PASTAS["skills"])
@@ -176,8 +178,26 @@ class Cofre:
             self._config = dados
         return self._config
 
+    def pastas_privadas(self) -> list[str]:
+        """Pastas (relativas, posix) que nenhuma IA lê pelo cofre: 99-Privado e as de `pastas_privadas`."""
+        saida = [PASTAS["privado"]]
+        for bruto in lista(self.config().get("pastas_privadas")):
+            rel = str(bruto).replace("\\", "/").strip().strip("/")
+            if rel and not {".", ".."} & set(rel.split("/")) and rel not in saida:
+                saida.append(rel)
+        return saida
+
+    def privado(self, caminho: Path | str) -> bool:
+        try:
+            rel = Path(caminho).resolve().relative_to(self.raiz.resolve()).as_posix()
+        except ValueError:
+            return False
+        caixa = str.lower if os.name == "nt" else str
+        rel = caixa(rel)
+        return any(rel == p or rel.startswith(p + "/") for p in map(caixa, self.pastas_privadas()))
+
     def _arquivos(self) -> Iterator[Path]:
-        excluidos = {(self.raiz / d).resolve() for d in DIRS_NAO_INDEXADOS}
+        excluidos = {(self.raiz / d).resolve() for d in (*DIRS_NAO_INDEXADOS, *self.pastas_privadas())}
         for pasta, dirs, arquivos in os.walk(self.raiz):
             dirs[:] = [
                 d for d in dirs

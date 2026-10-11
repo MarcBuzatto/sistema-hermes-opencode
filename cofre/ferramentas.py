@@ -52,7 +52,7 @@ def _buscar(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
 
 
 def _ler(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
-    return contexto.ler(cofre, a["id"])
+    return contexto.ler(cofre, a["id"], secao=a.get("secao"))
 
 
 def _registrar_fato(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
@@ -195,8 +195,10 @@ FERRAMENTAS: list[dict[str, Any]] = [
     },
     {
         "name": "cofre_ler",
-        "description": "Lê uma nota completa do vault pelo ID (ex.: F-7K3PQ, D-..., N-...), slug de projeto ou caminho relativo ao vault (ex.: \"30-Conhecimento/Pentest/Burp.md\").",
-        "inputSchema": _objeto({"id": {"type": "string"}}, ["id"]),
+        "description": ("Lê uma nota do vault pelo ID (ex.: F-7K3PQ, D-..., N-...), slug de projeto ou caminho relativo ao vault "
+                        "(ex.: \"30-Conhecimento/Pentest/Burp.md\"). Nota longa vem com o começo e a lista de seções: "
+                        "peça só a que servir com 'secao' (título ou número; 'tudo' = nota inteira)."),
+        "inputSchema": _objeto({"id": {"type": "string"}, "secao": {"type": "string"}}, ["id"]),
         "annotations": {"readOnlyHint": True},
         "handler": _ler,
     },

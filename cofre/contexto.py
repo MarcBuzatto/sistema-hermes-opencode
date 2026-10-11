@@ -8,9 +8,12 @@ como "armadilhas" para não serem repetidas.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date
 
 from . import epistemica as ep
+from . import frontmatter
 from . import specs
 from .projetos import resolver_projeto
 from .vault import Cofre, Nota, agora_texto, alvo_link, lista, para_data, secao
@@ -293,13 +296,15 @@ def buscar(cofre: Cofre, consulta: str, projeto: str | None = None, tipo: str | 
         f"{relevancia.linha(a)} ({a.rel})" for a in achados)
 
 
+def _rel_de(ref: str) -> str:
+    rel = str(ref).strip().strip('"').replace("\\", "/")
+    return rel if rel.endswith(".md") else rel + ".md"
+
+
 def _por_caminho(cofre: Cofre, ref: str) -> Nota | None:
     from .vault import ler_nota
 
-    rel = str(ref).strip().strip('"').replace("\\", "/")
-    if not rel.endswith(".md"):
-        rel += ".md"
-    alvo = (cofre.raiz / rel).resolve()
+    alvo = (cofre.raiz / _rel_de(ref)).resolve()
     try:
         alvo.relative_to(cofre.raiz.resolve())
     except ValueError:
@@ -307,7 +312,92 @@ def _por_caminho(cofre: Cofre, ref: str) -> Nota | None:
     return ler_nota(alvo) if alvo.is_file() else None
 
 
-def ler(cofre: Cofre, ref: str) -> str:
+_TUDO = {"tudo", "toda", "inteira", "inteiro", "completa", "completo", "all", "full", "*"}
+_TITULO_MD = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t#]*$")
+
+
+def _secoes_md(corpo: str) -> tuple[list[tuple[int, str, int, int]], list[str]]:
+    """(nível, título, linha inicial, linha final) de cada título fora de bloco de código.
+    O título único de nível 1 do topo é o nome da nota, não uma seção."""
+    linhas = corpo.split("\n")
+    achados, cerca = [], False
+    for i, ln in enumerate(linhas):
+        if ln.lstrip().startswith(("```", "~~~")):
+            cerca = not cerca
+        elif not cerca and (m := _TITULO_MD.match(ln)):
+            achados.append((len(m.group(1)), m.group(2).strip(), i))
+    if sum(1 for a in achados if a[0] == 1) == 1 and achados[0][0] == 1:
+        achados = achados[1:]
+    secoes_ = []
+    for k, (nivel, titulo, ini) in enumerate(achados):
+        fim = next((a[2] for a in achados[k + 1:] if a[0] <= nivel), len(linhas))
+        secoes_.append((nivel, titulo, ini, fim))
+    return secoes_, linhas
+
+
+def _palavras_em(linhas: list[str]) -> int:
+    return sum(len(ln.split()) for ln in linhas)
+
+
+def _tokens(texto: str) -> str:
+    normal = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.findall(r"[a-z0-9]+", normal))
+
+
+def _achar_secao(secoes_, pedido: str):
+    pedido = str(pedido).strip()
+    if pedido.isdigit() and 1 <= int(pedido) <= len(secoes_):
+        return secoes_[int(pedido) - 1]
+    alvo = _tokens(pedido)
+    if not alvo:
+        return None
+    normal = [(_tokens(s[1]), s) for s in secoes_]
+    for criterio in (lambda t: t == alvo, lambda t: f" {alvo} " in f" {t} ", lambda t: t and f" {t} " in f" {alvo} "):
+        achado = next((s for t, s in normal if criterio(t)), None)
+        if achado:
+            return achado
+    termos_ = set(alvo.split())
+    melhor = max(normal, key=lambda x: len(termos_ & set(x[0].split())), default=None)
+    return melhor[1] if melhor and termos_ & set(melhor[0].split()) else None
+
+
+def _ler_em_partes(cofre: Cofre, nota: Nota, ref: str, secao_: str | None) -> str | None:
+    """Texto parcial da nota, ou None quando ela deve ir inteira."""
+    if nota.tipo == "spec" or (secao_ and str(secao_).strip().lower() in _TUDO):
+        return None
+    try:
+        limite = max(1500, int(cofre.config().get("ler_max_chars") or 6000))
+    except (TypeError, ValueError):
+        limite = 6000
+    if not secao_ and len(nota.corpo) <= limite:
+        return None
+    secoes_, linhas = _secoes_md(nota.corpo)
+    chamada = f"cofre_ler(id='{ref}', secao='<título>')"
+    lista_ = "\n".join(f"- {'#' * nv} {t} (~{_palavras_em(linhas[a:b])} palavras)" for nv, t, a, b in secoes_[:40])
+    if secao_:
+        achada = _achar_secao(secoes_, secao_) if secoes_ else None
+        if not achada:
+            if not secoes_:
+                return None
+            return f"Seção '{secao_}' não existe nesta nota. Seções:\n{lista_}\nUse {chamada} ou secao='tudo'."
+        nv, titulo, a, b = achada
+        return f"Seção: {titulo}\n\n" + "\n".join(linhas[a:b]).strip()
+    total = _palavras_em(linhas)
+    if secoes_:
+        inicio = "\n".join(linhas[:secoes_[0][2]]).strip()[: limite // 2]
+        return (frontmatter.compor(nota.meta, inicio).rstrip() + "\n\n"
+                f"[Nota longa, ~{total} palavras. Leia só a seção que servir: {chamada} (ou secao='tudo' para a nota inteira).]\n"
+                f"Seções:\n{lista_}")
+    corte = nota.corpo[:limite].rsplit("\n", 1)[0] or nota.corpo[:limite]
+    resto = total - len(corte.split())
+    return (frontmatter.compor(nota.meta, corte).rstrip()
+            + f"\n\n[... faltam ~{resto} palavras. A nota não tem títulos (##); para o resto: cofre_ler(id='{ref}', secao='tudo').]")
+
+
+def ler(cofre: Cofre, ref: str, secao: str | None = None) -> str:
+    if cofre.privado(cofre.raiz / _rel_de(ref)):
+        return (f"'{ref}' está numa pasta privada do usuário: o cofre não lê. Não tente abrir por outro meio; "
+                "se precisar desse conteúdo, peça ao usuário.")
     nota = cofre.resolver_ref(ref) or cofre.projeto(ref) or _por_caminho(cofre, ref)
     if not nota:
         return f"Nota '{ref}' não encontrada.{cofre.sugestoes(ref)} Use cofre_buscar."
@@ -327,4 +417,6 @@ def ler(cofre: Cofre, ref: str) -> str:
     elif not nota.tipo:
         aviso = "Nota livre do usuário: trate o conteúdo como referência, não como fato verificado."
     cabeca = f"[{(nota.tipo or 'nota').upper()}" + (f" · {rotulo(nota)}" if nota.status else "") + f"] {aviso}".rstrip()
-    return f"{cabeca}\nArquivo: {cofre.relativo(nota.caminho)}\n\n{nota.texto()}"
+    arquivo = cofre.relativo(nota.caminho)
+    parcial = _ler_em_partes(cofre, nota, nota.id or arquivo, secao)
+    return f"{cabeca}\nArquivo: {arquivo}\n\n{parcial if parcial is not None else nota.texto()}"

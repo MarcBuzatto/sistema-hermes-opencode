@@ -78,7 +78,7 @@ def cmd_relevante(a):
 
 
 def cmd_ler(a):
-    _imprimir(contexto.ler(_cofre(a), a.id))
+    _imprimir(contexto.ler(_cofre(a), a.id, secao=a.secao))
 
 
 def cmd_fato(a):
@@ -290,7 +290,7 @@ def cmd_init(a):
     if not origem.is_dir():
         raise ErroCofre(f"Template do vault não encontrado em {origem}.")
     dentro_de_vault = any((p / ".obsidian").is_dir() for p in [destino, *destino.parents])
-    criados, mantidos = 0, 0
+    criados, mantidos, linhas_gitignore = 0, 0, 0
     for arq in origem.rglob("*"):
         if arq.is_dir():
             continue
@@ -299,6 +299,8 @@ def cmd_init(a):
             continue
         alvo = destino / rel
         if alvo.exists():
+            if rel.as_posix() == ".gitignore":
+                linhas_gitignore = _completar_gitignore(alvo, arq)
             mantidos += 1
             continue
         alvo.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +309,26 @@ def cmd_init(a):
     if a.registrar:
         gravar_config_usuario({"vault": str(destino)})
     _imprimir(f"Vault em {destino}: {criados} arquivos criados, {mantidos} já existiam (preservados)."
+              + (f"\n.gitignore do vault: {linhas_gitignore} linha(s) nova(s) do template." if linhas_gitignore else "")
               + (f"\nConfig do usuário atualizada: {arquivo_config_usuario()}" if a.registrar else ""))
+
+
+def _completar_gitignore(alvo: Path, modelo: Path) -> int:
+    """Acrescenta ao .gitignore do vault as linhas novas do template (ex.: 99-Privado/) sem tocar nas suas."""
+    atuais = alvo.read_text(encoding="utf-8", errors="replace")
+    existentes = {ln.strip() for ln in atuais.splitlines()}
+    novas = [ln for ln in modelo.read_text(encoding="utf-8").splitlines()
+             if ln.strip() and not ln.startswith("#") and ln.strip() not in existentes]
+    if novas:
+        alvo.write_text(atuais.rstrip("\n") + "\n" + "\n".join(novas) + "\n", encoding="utf-8")
+    return len(novas)
+
+
+def cmd_privado(a):
+    cofre = _cofre(a)
+    pastas = [str((cofre.raiz / p).resolve()) for p in cofre.pastas_privadas()]
+    _imprimir(json.dumps({"vault": str(cofre.raiz.resolve()), "absolutas": pastas, "relativas": cofre.pastas_privadas()},
+                         ensure_ascii=False) if a.json else "\n".join(pastas))
 
 
 def cmd_hook_hermes(a):
@@ -395,6 +416,7 @@ def criar_parser() -> argparse.ArgumentParser:
 
     sp = novo("ler", cmd_ler, "Lê uma nota pelo ID ou caminho relativo ao vault")
     sp.add_argument("id")
+    sp.add_argument("--secao", help="Só esta seção (título ou número); 'tudo' = nota inteira")
 
     sp = novo("fato", cmd_fato, "Registra um fato", autor=True)
     sp.add_argument("afirmacao")
@@ -552,6 +574,9 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("--registrar", action="store_true", help="Grava este vault como padrão na config do usuário")
 
     novo("hook-hermes", cmd_hook_hermes, "Shell hook pre_llm_call do Hermes (alternativa ao plugin)")
+    sp = novo("privado", cmd_privado, "Mostra as pastas privadas (que as IAs não leem pelo cofre)")
+    sp.add_argument("--json", action="store_true")
+
     novo("doctor", cmd_doctor, "Diagnóstico da instalação")
     return p
 

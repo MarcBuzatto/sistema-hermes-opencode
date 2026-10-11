@@ -2,7 +2,20 @@
 
 Respostas do usuário às perguntas de `prompts-notebooklm.md`, guardadas para análise depois que todas chegarem. O texto é o que o NotebookLM respondeu, com duas edições: tirei os emojis e as ofertas do fim de cada resposta ("Quer que eu monte..."). Os números entre colchetes são as citações das fontes do caderno do usuário.
 
-Situação: recebidas todas (contexto e 1 a 13).
+Situação: recebidas todas (contexto e 1 a 13) e analisadas.
+
+## O que virou mudança no cofre
+
+| Resposta | Aplicado | Não aplicado (e por quê) |
+| --- | --- | --- |
+| 1-4 | Datas no formato do Obsidian, `description` como resumo do ponteiro, MOC por `tipo: moc` ou tag, arquivo morto fora da busca automática, regras de título/tags/propriedades na doc | `CLAUDE.md`, `.claude/rules` e `.claudeignore`: são do Claude Code, que não usa o cofre; mover notas pelo Obsidian CLI: o cofre não move notas |
+| 5 e 7 | `cofre_ler` de nota longa devolve o começo e a lista de seções (`ler_max_chars`); a IA pede só a seção (`secao`); revisão aponta nota longa sem títulos | Ler só o frontmatter de cada arquivo: o índice do cofre já resume cada nota em uma linha; os números de economia (92,5%, 60%) não têm fonte verificável |
+| 6 | Já estava: todos os `.base` começam filtrando por `tipo` ou pasta e o do projeto usa `this.file`; Skills.base ganhou `status` e `fontes` | Dataview: o cofre usa só recursos nativos |
+| 7 e 12 | Pasta `80-Anexos` com `attachmentFolderPath`; fonte com `anexo:` | `userIgnoreFilters` para arquivo morto e anexos: no Obsidian isso esconde da busca e das sugestões de link, o que atrapalha você; o cofre já ignora essas pastas sozinho |
+| 8 e 9 | Inbox.base com "Tudo na inbox"; revisão aponta notas sem nenhum link, temas com 3+ notas sem MOC e itens parados na inbox; rotina semanal/mensal na doc | Templater e QuickAdd: opcionais, nada no cofre depende deles |
+| 10 | Fluxo fonte -> hipótese -> verificado -> skill com `status` e `fontes`, blocos `[!check]`/`[!quote]`; skill em rascunho marcada na relevância; `cofre skills verificar` cobra `fontes` | Pastas `20-Literature/` e `30-Permanent/`: o cofre já separa por `tipo` (fonte vs. fato verificado) |
+| 11 | Procedimentos para as IAs continuam como skills em `60-Skills/` (com `status`, `fontes` e git) | `.claude/agents` e `CLAUDE.md`: Claude Code. Agentes guardados no vault e sincronizados para OpenCode/Hermes: proposto como próximo passo |
+| 13 | `99-Privado/` e `pastas_privadas`: fora do índice, da busca, da relevância e do `cofre_ler`; no `.gitignore`; revisão acusa pasta privada versionada; plugin do OpenCode bloqueia ferramentas que apontem para ela; doc de sync e backup | Deny rules em `.claude/settings.local.json`: Claude Code. No Hermes o plugin não tem como bloquear ferramenta de arquivo; documentado como limite |
 
 ---
 

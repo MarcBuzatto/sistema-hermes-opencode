@@ -106,9 +106,10 @@ def _distancia_ate_1(a: str, b: str) -> bool:
 
 
 # ---- índice ----------------------------------------------------------------
-def _arquivos(raiz: Path):
+def _arquivos(raiz: Path, privadas=()):
     """(caminho relativo posix, caminho absoluto, mtime) de cada nota indexável."""
-    fora = {PASTAS["sistema"], DIR_EXPORTACOES}
+    caixa = str.lower if os.name == "nt" else str
+    fora = {caixa(x) for x in (PASTAS["sistema"], DIR_EXPORTACOES, PASTAS["privado"], *privadas)}
     pilha = [("", str(raiz))]
     while pilha:
         prefixo, pasta = pilha.pop()
@@ -123,7 +124,7 @@ def _arquivos(raiz: Path):
             rel = prefixo + nome
             try:
                 if e.is_dir():
-                    if nome not in IGNORAR_DIRS and rel not in fora:
+                    if nome not in IGNORAR_DIRS and caixa(rel) not in fora:
                         pilha.append((rel + "/", e.path))
                 elif nome.endswith(".md") and nome != "LEIA-ME.md":
                     yield rel, e.path, e.stat().st_mtime
@@ -231,11 +232,13 @@ _MEMORIA: dict[str, tuple[float, int, dict, dict]] = {}
 MEMORIA_TTL = 5.0
 
 
-def carregar_indice(raiz: Path, salvar: bool = True) -> dict[str, dict]:
+def carregar_indice(raiz: Path, salvar: bool = True, privadas=()) -> dict[str, dict]:
     """Índice do vault. Em processos que ficam abertos (plugin do Hermes, servidor MCP), reaproveita
-    o índice em memória por MEMORIA_TTL segundos, ou até o próprio processo gravar no vault."""
+    o índice em memória por MEMORIA_TTL segundos, ou até o próprio processo gravar no vault.
+    Pastas privadas ficam fora (e saem do índice salvo se já estavam lá)."""
     raiz = Path(raiz)
-    chave = str(raiz.resolve())
+    privadas = tuple(privadas)
+    chave = str(raiz.resolve()) + "\0" + "|".join(privadas)
     em_memoria = _MEMORIA.get(chave)
     if em_memoria and em_memoria[1] == GERACAO[0] and time.monotonic() - em_memoria[0] < MEMORIA_TTL:
         return em_memoria[2]
@@ -250,7 +253,7 @@ def carregar_indice(raiz: Path, salvar: bool = True) -> dict[str, dict]:
             pass
     novo: dict[str, dict] = {}
     mudou = False
-    for rel, caminho, mtime in _arquivos(raiz):
+    for rel, caminho, mtime in _arquivos(raiz, privadas):
         doc = antigo.get(rel)
         if doc is None or doc.get("mtime") != mtime:
             doc = _analisar(raiz, Path(caminho), mtime)
@@ -315,7 +318,7 @@ def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5
     originais = sem_projeto or originais
     if not originais:
         return []
-    docs = carregar_indice(cofre.raiz)
+    docs = carregar_indice(cofre.raiz, privadas=cofre.pastas_privadas())
     if not incluir_arquivo:
         docs = {k: d for k, d in docs.items() if not k.startswith(PASTAS["arquivo"] + "/")}
     if tipos:
@@ -411,7 +414,8 @@ def linha(a: Achado) -> str:
     d = a.doc
     tipo, st = d.get("tipo"), d.get("status")
     if tipo == "skill":
-        return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir)"
+        aviso = " [RASCUNHO: passos não testados; avise o usuário antes de seguir]" if d.get("status") == "rascunho" else ""
+        return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir){aviso}"
     if tipo == "instrucao":
         return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: cofre_ler \"{a.rel}\""
     if tipo == "moc":

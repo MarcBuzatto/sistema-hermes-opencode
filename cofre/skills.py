@@ -24,6 +24,8 @@ from . import frontmatter
 PASTA_SKILLS = "60-Skills"
 MARCA_SYNC = ".cofre-sync"
 ID_VALIDO = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# Skills vindas de pesquisa: `status` diz se os passos foram testados e `fontes` aponta a origem.
+STATUS_SKILL = ("rascunho", "verificada", "obsoleta")
 _TEXTO = {".md", ".txt", ".py", ".sh", ".ps1", ".js", ".ts", ".json", ".yaml", ".yml", ".toml"}
 
 
@@ -45,6 +47,11 @@ class Skill:
     @property
     def descricao(self) -> str:
         return " ".join(str(self.meta.get("description") or "").split())
+
+
+def lista_fontes(meta: dict) -> list[str]:
+    bruto = meta.get("fontes") or meta.get("sources") or []
+    return [str(x) for x in (bruto if isinstance(bruto, list) else [bruto]) if str(x).strip()]
 
 
 def pasta_skills(raiz_vault: Path) -> Path:
@@ -84,6 +91,11 @@ def verificar(raiz_vault: Path) -> list[tuple[str, str, str]]:
             achados.append(("erro", rot, "sem 'description' no frontmatter: o modelo nunca vai saber quando usar"))
         elif len(s.descricao) > 1024:
             achados.append(("alerta", rot, "description com mais de 1024 caracteres"))
+        status = str(s.meta.get("status") or "").strip().lower()
+        if status in ("verificada", "verificado", "ativa") and not lista_fontes(s.meta):
+            achados.append(("alerta", rot, f"status '{status}' sem 'fontes': liste as notas (N-..., F-...) ou links que comprovam a skill"))
+        elif status and status not in STATUS_SKILL:
+            achados.append(("alerta", rot, f"status '{status}' desconhecido (use {', '.join(STATUS_SKILL)})"))
         if not s.nome:
             achados.append(("alerta", rot, "sem 'name' no frontmatter"))
         elif s.nome != s.id:

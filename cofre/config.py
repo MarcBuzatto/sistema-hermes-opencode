@@ -34,6 +34,10 @@ PADROES_VAULT = {
     # rodar além dos de teste/lint/build conhecidos (prefixos exatos, ex.: "docker compose run --rm api pytest").
     "verificacao_timeout": 300,
     "verificacao_comandos": [],
+    # Nota maior que isso: cofre_ler devolve o começo e a lista de seções; a IA pede só a seção útil.
+    "ler_max_chars": 6000,
+    # Pastas que as IAs não leem pelo cofre (além de 99-Privado), relativas ao vault.
+    "pastas_privadas": [],
 }
 
 

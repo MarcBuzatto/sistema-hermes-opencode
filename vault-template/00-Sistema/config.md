@@ -16,6 +16,8 @@ relevancia_max_chars: 1600
 relevancia_repete_turnos: 6
 verificacao_timeout: 300
 verificacao_comandos: []
+ler_max_chars: 6000
+pastas_privadas: []
 ---
 # Configuração do cofre
 
@@ -39,3 +41,5 @@ Edite as propriedades acima pelo painel de propriedades do Obsidian. Elas valem 
 | `relevancia_repete_turnos` | No Hermes, um ponteiro de relevância não repete nos próximos N turnos; reaparece depois (útil ao trocar de LLM na mesma conversa ou após compactação). `0` repete sempre. |
 | `verificacao_timeout` | Specs: tempo máximo (segundos) de cada comando de verificação que o cofre roda ao concluir uma tarefa. |
 | `verificacao_comandos` | Specs: comandos extras que o cofre pode rodar como verificação, além dos de teste/lint/build conhecidos (npm test, pytest, go test, cargo test...). Prefixo exato, ex.: `docker compose run --rm api pytest`. O cofre nunca usa shell. |
+| `ler_max_chars` | Nota maior que isso: `cofre_ler` devolve o começo e a lista de seções, e a IA pede só a seção que precisa (economiza tokens). Ponha títulos `##` nas notas longas. |
+| `pastas_privadas` | Pastas (relativas ao vault) que as IAs não leem pelo cofre, além de `99-Privado`. Ex.: `40-Clientes/Confidencial`. Acrescente também ao `.gitignore` do vault. |

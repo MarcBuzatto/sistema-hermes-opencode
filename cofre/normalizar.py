@@ -30,7 +30,7 @@ ALIASES_CHAVE = {
     "title": "titulo", "name": ("titulo", "nome", "slug"), "nome": ("titulo", "nome"), "nome_spec": "titulo", "objective": "objetivo", "goal": "objetivo",
     "decision": "decisao", "alternatives": "alternativas", "consequences": "consequencias",
     "user_quote": "citacao_usuario", "citacao": "citacao_usuario", "quote": "citacao_usuario",
-    "text": "texto", "content": "conteudo", "section": "secao", "mode": "modo",
+    "text": "texto", "content": "conteudo", "section": "secao", "heading": "secao", "parte": "secao", "capitulo": "secao", "mode": "modo",
     "link": "url", "site": "url", "endereco": "url", "when_to_use": "quando_usar", "usar_quando": "quando_usar",
     "path": "caminho", "repository": "repo", "client": "cliente", "description": "descricao",
     "criticality": "criticidade", "force": "forcar", "limit": "limite", "type": "tipo", "model": "agente",

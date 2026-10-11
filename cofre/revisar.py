@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import time
 from dataclasses import dataclass
 from datetime import date
 
@@ -12,8 +14,8 @@ from .contexto import vencido
 from .projetos import bases_de_arquivos
 from .registrar import Autor, _corpo_fato, _linha_hist
 from .vault import (
-    PASTAS, STATUS_DECISAO, STATUS_FATO, STATUS_MISSAO, STATUS_SPEC, Cofre, Nota, escrever_atomico, hoje, ler_nota,
-    lista, para_data, secoes,
+    _LINK, PASTAS, STATUS_DECISAO, STATUS_FATO, STATUS_MISSAO, STATUS_SPEC, Cofre, Nota, escrever_atomico, hoje,
+    ler_nota, lista, para_data, secoes,
 )
 
 GRAVIDADE = {"erro": 0, "alerta": 1, "info": 2}
@@ -118,11 +120,99 @@ def revisar(cofre: Cofre, projeto: str | None = None, conferir_evidencias: bool 
         if n.tipo == "spec":
             achados += _revisar_spec(n)
         if n.tipo == "captura" and n.status == "pendente":
-            achados.append(Achado("info", _rotulo(n), f"captura pendente de triagem na inbox: {n.caminho.stem}"))
+            criada = para_data(n.meta.get("capturado_em"))
+            idade = f" (há {(hoje_d - criada).days} dias)" if criada and (hoje_d - criada).days >= 2 else ""
+            achados.append(Achado("info", _rotulo(n), f"captura pendente de triagem na inbox{idade}: {n.caminho.stem}"))
     if not projeto:
         achados += [Achado(g, n, m) for g, n, m in skills_mod.verificar(cofre.raiz)]
+        achados += _revisar_notas_livres(cofre)
+        achados += _revisar_privadas(cofre)
     achados.sort(key=lambda a: (GRAVIDADE.get(a.gravidade, 9), a.nota))
     return achados
+
+
+_FORA_DAS_LIVRES = (PASTAS["sistema"], PASTAS["inbox"], PASTAS["sessoes_gerais"], PASTAS["arquivo"])
+_TITULO_SECAO = re.compile(r"^#{2,6}[ \t]+\S", re.M)
+
+
+def _revisar_notas_livres(cofre: Cofre) -> list[Achado]:
+    """Notas que você escreveu (sem `tipo`): sem nenhum link, temas com 3+ notas sem MOC, notas longas."""
+    livres, mocs, alvos, paradas = [], [], set(), []
+    for caminho in cofre._arquivos():
+        try:
+            nota, idade = ler_nota(caminho), time.time() - caminho.stat().st_mtime
+        except OSError:
+            continue
+        rel = cofre.relativo(caminho)
+        links = {re.sub(r"\.md$", "", m.strip().rsplit("/", 1)[-1].lower()) for m in _LINK.findall(nota.texto())}
+        alvos |= links
+        tags = {str(t).lower().lstrip("#") for t in lista(nota.meta.get("tags"))}
+        if nota.meta.get("exemplo") or caminho.name == "LEIA-ME.md":
+            continue
+        if rel.startswith(PASTAS["inbox"] + "/"):
+            if not nota.tipo and idade > 3 * 86400:
+                paradas.append(rel)
+            continue
+        if rel.startswith(tuple(p + "/" for p in _FORA_DAS_LIVRES)):
+            continue
+        if nota.tipo == "moc" or (not nota.tipo and "moc" in tags):
+            mocs.append(links)
+        elif not nota.tipo:
+            nomes = {caminho.stem.lower(), *(str(a).lower() for a in lista(nota.meta.get("aliases")))}
+            livres.append((rel, nota, links, nomes, tags - {"moc"}))
+    saida: list[Achado] = []
+    if paradas:
+        saida.append(Achado("info", PASTAS["inbox"], f"{len(paradas)} nota(s) sua(s) na inbox há mais de 3 dias: "
+                                                    "transforme em nota permanente (com pelo menos um link) ou apague"))
+    orfas = [rel for rel, _n, links, nomes, _t in livres if not links and not (nomes & alvos)]
+    if orfas:
+        mostra = ", ".join(orfas[:8]) + (f" e mais {len(orfas) - 8}" if len(orfas) > 8 else "")
+        saida.append(Achado("info", "notas", f"{len(orfas)} nota(s) sem nenhum [[link]] (nem para ela, nem dela): {mostra}. "
+                                          "Ligue cada uma a pelo menos uma nota ou MOC do assunto."))
+    cobertas = set().union(*mocs) if mocs else set()
+    grupos: dict[str, list] = {}
+    for rel, _n, _l, nomes, tags in livres:
+        pasta = rel.rsplit("/", 1)[0] if "/" in rel else ""
+        chaves = {f"tag #{t}" for t in tags}
+        if pasta.startswith(PASTAS["conhecimento"] + "/"):
+            chaves.add(f"pasta {pasta}")
+        for c in chaves:
+            grupos.setdefault(c, []).append(nomes)
+    sem_mapa = [(c, len(m)) for c, m in grupos.items()
+                if len(m) >= 3 and sum(1 for nomes in m if nomes & cobertas) * 2 < len(m)]
+    for chave, qtd in sorted(sem_mapa, key=lambda x: (-x[1], x[0]))[:10]:
+        saida.append(Achado("info", "notas", f"{qtd} notas em {chave} sem mapa do assunto: crie um MOC "
+                                          f"({PASTAS['conhecimento']}/MOCs/, template MOC) ligando-as; a IA abre o MOC primeiro e gasta menos."))
+    for rel, nota, _l, _nm, _t in livres:
+        palavras = len(nota.corpo.split())
+        if palavras > 4000:
+            saida.append(Achado("info", rel, f"nota com ~{palavras} palavras: se trata de vários assuntos, quebre em notas menores + MOC"))
+        elif palavras > 1500 and not _TITULO_SECAO.search(nota.corpo):
+            saida.append(Achado("info", rel, f"nota com ~{palavras} palavras e sem títulos (##): ponha títulos para a IA ler só a parte útil"))
+    return saida
+
+
+def _revisar_privadas(cofre: Cofre) -> list[Achado]:
+    """Pasta privada dentro de um vault com git: precisa estar no .gitignore e fora do índice do git."""
+    from .gitlog import _git
+
+    if not (cofre.raiz / ".git").exists():
+        return []
+    saida = []
+    for rel in cofre.pastas_privadas():
+        if not (cofre.raiz / rel).is_dir():
+            continue
+        try:
+            ignorada = _git(cofre.raiz, "check-ignore", "-q", rel + "/").returncode == 0
+            versionados = _git(cofre.raiz, "ls-files", "--", rel).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if versionados:
+            saida.append(Achado("erro", rel, f"pasta privada já está versionada no git do vault: rode "
+                                             f"`git -C \"{cofre.raiz}\" rm -r --cached \"{rel}\"` (o histórico antigo continua com o conteúdo)"))
+        if not ignorada:
+            saida.append(Achado("erro", rel, f"pasta privada fora do .gitignore do vault: acrescente a linha `{rel}/`"))
+    return saida
 
 
 def _revisar_spec(n: Nota) -> list[Achado]:

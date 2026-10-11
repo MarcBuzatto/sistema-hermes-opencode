@@ -49,8 +49,11 @@ As skills ficam em `60-Skills/` no vault e aparecem para Hermes e OpenCode como 
    - **Contestados:** decida.
    - **Revisão vencida:** peça reverificação.
    - **Decisões aguardando você:** aceite ou rejeite (mude `status` ou rode `cofre aceitar-decisao D-XXXXX --humano`).
-   - **Inbox:** transforme em fato/decisão/missão ou apague.
-3. Atualize o `Perfil` se alguma preferência nova apareceu.
+   - **Inbox:** transforme em fato/decisão/missão ou nota permanente (com pelo menos um link), ou apague.
+3. Veja no relatório as notas sem link e os temas sem MOC; ligue as notas soltas e crie o MOC (modelo `MOC`) dos temas com 3 ou mais notas.
+4. Atualize o `Perfil` se alguma preferência nova apareceu.
+
+Uma vez por mês: confira se o backup fora da máquina está rodando e se nada sensível foi parar fora de `99-Privado/`.
 
 ## Comandos do terminal
 
