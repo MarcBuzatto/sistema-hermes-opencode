@@ -7,9 +7,9 @@
 | `00-Sistema/` | `Inicio` (painel), `LEIA-ME`, `Perfil`, `config`, `Paineis/*.base`, `Templates/`, `Relatorios/`, `Exemplos/` | Você |
 | `01-Inbox/` | Capturas brutas `C-XXXXX` | Agentes e você; você tria |
 | `02-Sessoes/` | Sessões sem projeto `S-XXXXX` | Agentes |
-| `10-Projetos/<slug>/` | `<slug>.md` (hub), `<slug> - Estado.md`, `Fatos/`, `Decisoes/`, `Sessoes/` | Agentes (via MCP) e você |
+| `10-Projetos/<slug>/` | `<slug>.md` (hub), `<slug> - Estado.md`, `Fatos/`, `Decisoes/`, `Sessoes/`, `Specs/` | Agentes (via MCP) e você |
 | `20-Missoes/` | Missões `M-XXXXX` | Agentes e você |
-| `30-Conhecimento/` | `Fatos/` e `Decisoes/` globais (máquina, ferramentas, conhecimento geral) | Agentes e você |
+| `30-Conhecimento/` | `Fatos/` e `Decisoes/` globais (máquina, ferramentas, conhecimento geral); `Instrucoes/` com as seções do seu AGENTS.md levadas para o vault | Agentes, você e `cofre agents-md` |
 | `40-Clientes/` | Hub por cliente (modelo `Cliente`) | Você |
 | `50-Fontes/` | Material externo; `NotebookLM/` com respostas importadas `N-XXXXX` | Você e agentes |
 | `60-Skills/` | Skills no formato Agent Skills (`<categoria>/<skill>/SKILL.md`); `sistema/` tem as do cofre | Você, o instalador (`sistema/`) e o Hermes ao aprender skills (com sua aprovação) |
@@ -19,7 +19,7 @@ Nomes de pasta são ASCII de propósito: agentes e shells de Windows lidam mal c
 
 ## Identificadores
 
-`F-` fato, `D-` decisão, `S-` sessão, `M-` missão, `C-` captura, `N-` fonte, seguidos de 5 caracteres do alfabeto Crockford (sem I, L, O, U, para não confundir). O arquivo se chama `<ID> <slug-da-afirmação>.md` e o ID também vai em `aliases`. Agentes citam só o ID; o motor resolve.
+`F-` fato, `D-` decisão, `S-` sessão, `M-` missão, `C-` captura, `N-` fonte, `E-` spec, seguidos de 5 caracteres do alfabeto Crockford (sem I, L, O, U, para não confundir). O arquivo se chama `<ID> <slug-da-afirmação>.md` e o ID também vai em `aliases`. Agentes citam só o ID; o motor resolve.
 
 ## Propriedades por tipo
 
@@ -57,6 +57,12 @@ Um por projeto. `atualizado`, `atualizado_por`, `ultima_sessao`. Corpo: Foco atu
 ### Missão (`tipo: missao`)
 `id`, `titulo`, `status` (`ativa`, `pausada`, `concluida`, `cancelada`), `projetos`, `criada`, `atualizada`. Corpo: Objetivo, Critérios de pronto, Passos (checklist), Log.
 
+### Spec (`tipo: spec`)
+`id`, `titulo`, `status` (`rascunho`, `aprovada`, `em_execucao`, `concluida`, `cancelada`), `projeto`, `aprovada_em`, `citacao_usuario`, `hash_aprovado`. Corpo: Objetivo, Requisitos (`- R1: ...`), Fora de escopo, Perguntas em aberto (`- [ ] P1: ...`), Plano, Tarefas (``- [ ] T1: descrição · cobre: R1 · verificar: `comando` ``; `[/]` em andamento, `[x]` concluída, `[!]` bloqueada, `[-]` cancelada), Histórico. Edite pelas ferramentas ou pelo terminal; mudar requisitos ou tarefas à mão depois da aprovação pede nova aprovação. Detalhes em [08-specs-e-harness.md](08-specs-e-harness.md).
+
+### Instrução (`tipo: instrucao`)
+Seção do seu AGENTS.md levada para o vault por `cofre agents-md dividir`: `titulo`, `origem`, `tags`, `aliases`. Aparece para a IA como "instrução sua" quando o assunto surge.
+
 ### Outras
 `captura` (inbox, `status: pendente`), `fonte` (`origem`, `confiabilidade`), `perfil`, `config`. Notas sem `tipo` (como os `LEIA-ME`) são ignoradas pelo motor.
 
@@ -89,10 +95,11 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | Base | Visões |
 | --- | --- |
 | `Fatos.base` | Hipóteses abertas, Verificados, Revisão vencida, Contestados, Armadilhas (refutados), Por status (kanban) |
-| `Projeto.base` | Embutido no hub de cada projeto (`this.file`): Hipóteses, Verificados, Contestados e armadilhas, Decisões, Sessões |
+| `Projeto.base` | Embutido no hub de cada projeto (`this.file`): Hipóteses, Verificados, Contestados e armadilhas, Decisões, Sessões, Specs |
 | `Projetos.base` | Tabela e cartões |
 | `Decisoes.base` | Propostas aguardando você, Aceitas, Todas |
 | `Missoes.base` | Quadro (kanban por status), Tabela |
+| `Specs.base` | Quadro (kanban por status: rascunho, aprovada, em execução, concluída), Tabela |
 | `Sessoes.base` | Recentes (14 dias), Todas |
 | `Inbox.base` | Capturas pendentes |
 | `Skills.base` | Skills em `60-Skills` (nome, quando usar, pasta) |

@@ -33,8 +33,9 @@ Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERME
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação); a cada mensagem, bloco com o que o vault tem sobre o assunto (sem repetir itens já mostrados na sessão); âncora com o foco atual a cada N turnos; aviso ao fechar sessão longa sem checkpoint |
-| `mcp_servers.cofre` | Servidor MCP stdio | As 10 ferramentas `cofre_*` |
+| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação); a cada mensagem, bloco com o que o vault tem sobre o assunto (sem repetir itens já mostrados na sessão), a linha AGORA da spec ativa (sem spec, âncora com o foco a cada N turnos) e lembrete depois de N mensagens sem checkpoint; aviso ao fechar sessão longa sem checkpoint |
+| `mcp_servers.cofre` | Servidor MCP stdio, `timeout: 1200` | As 12 ferramentas `cofre_*`. O timeout cobre a verificação de tarefas de spec (padrão do Hermes: 300 s) |
+| `agent.personalities.spec` | Personality `spec` | `/personality spec` liga o modo spec (SDD com verificação). Se você já tem uma personality com esse nome, ela é mantida |
 | `plugins.enabled` | `+ cofre` | Plugins do usuário são opt-in |
 | `skills.create_dir` | `<vault>/60-Skills` | O Hermes lê as skills do vault e cria as que aprender lá. Se você já usa `create_dir` para outra pasta, o instalador mantém e adiciona o vault em `skills.external_dirs` |
 | `skills.write_approval` | `true` | Skill criada/editada pelo agente espera sua aprovação (`/skills pending`) antes de ir para o vault |
@@ -44,7 +45,7 @@ Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERME
 
 `SOUL.md` não é tocado. Listas são mescladas (o instalador lê o valor atual com `hermes config get --json`). Antes de desligar o `MEMORY.md`, ele faz backup e leva cada entrada para `01-Inbox` como captura não verificada.
 
-Skills do Hermes com o mesmo nome de uma skill do vault têm precedência (ordem do Hermes: projeto, `~/.hermes/skills`, `create_dir`, `external_dirs`). Skills viram comandos: `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar`, `/cofre-notebooklm`, `/cofre-protocolo`.
+Skills do Hermes com o mesmo nome de uma skill do vault têm precedência (ordem do Hermes: projeto, `~/.hermes/skills`, `create_dir`, `external_dirs`). Skills viram comandos: `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar`, `/cofre-notebooklm`, `/cofre-protocolo`, `/cofre-sdd`.
 
 ## OpenCode
 
@@ -52,11 +53,12 @@ Em `~/.config/opencode` (ou `OPENCODE_CONFIG_DIR`). `AGENTS.md` não é tocado.
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hook `context` (contexto e regras no sistema a cada chamada, com cache de 30 s, mais o bloco do que o vault tem sobre a última mensagem do usuário) e `compaction`; V1: `experimental.chat.system.transform`, `experimental.chat.messages.transform` (lê a última mensagem) e `experimental.session.compacting`. Sem o plugin, só as instruções do MCP chegam ao modelo |
-| `opencode.json` > MCP | Servidor `cofre` | V2: `mcp.servers.cofre` com `codemode: false` (ferramentas direto na lista nativa, melhor para modelos fracos). V1 ou versão desconhecida: `mcp.cofre`. Com `opencode.jsonc`, o instalador mostra o trecho para colar |
+| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hook `context` (contexto, linha AGORA e regras no sistema a cada chamada, mais o bloco do que o vault tem sobre a última mensagem do usuário; instruções do modo spec quando o agente `spec` está ativo; lembrete de checkpoint) e `compaction`; V1: `experimental.chat.system.transform`, `experimental.chat.messages.transform` (lê a última mensagem e o agente) e `experimental.session.compacting`. Cache de 30 s, refeito quando aparece chamada nova a ferramenta do cofre. Sem o plugin, só as instruções do MCP chegam ao modelo |
+| `opencode.json` > MCP | Servidor `cofre` | V2: `mcp.servers.cofre` com `codemode: false` (ferramentas direto na lista nativa, melhor para modelos fracos); sem `timeout`, porque o padrão de execução da V2 é 12 h. V1 ou versão desconhecida: `mcp.cofre` com `timeout: 1200000`. Com `opencode.jsonc`, o instalador mostra o trecho para colar |
+| `agents/spec.md` | Agente `spec` | Modo spec (Tab). Sem prompt próprio: na V2 o prompt de agente substitui o prompt base; as instruções vêm do plugin. Formato V1, que a V2 migra (`permission` vira `permissions`) |
 | `opencode.json` > `skills` | `+ <vault>/60-Skills` (só V2) | A V2 lê skills de qualquer profundidade nessa pasta |
 | `skills/` | Cópias das skills do vault (só V1 ou versão desconhecida) | A V1 só enxerga `~/.config/opencode/skills/*/SKILL.md`. O plugin refaz a cópia a cada início; as cópias têm `.cofre-sync` e skills suas nessa pasta não são tocadas |
-| `commands/` | `ctx.md`, `checkpoint.md`, `corrigir.md`, `revisar-cofre.md` | Comandos `/ctx`, `/checkpoint`, `/corrigir`, `/revisar-cofre`. Arquivos seus com o mesmo nome não são sobrescritos |
+| `commands/` | `ctx.md`, `checkpoint.md`, `corrigir.md`, `revisar-cofre.md`, `spec.md`, `proxima.md` | Comandos `/ctx`, `/checkpoint`, `/corrigir`, `/revisar-cofre`, `/spec`, `/proxima`. Arquivos seus com o mesmo nome não são sobrescritos |
 
 O servidor MCP recebe do OpenCode o ID da sessão (`_meta["ai.opencode/sessionID"]`) e agrupa os checkpoints de uma conversa na mesma nota de sessão.
 
@@ -97,6 +99,8 @@ O motor trata `C:/Users/voce/dev/loja` e `/mnt/c/Users/voce/dev/loja` como o mes
 | `cofre_capturar` | Inbox |
 | `cofre_projeto` | listar, criar, vincular |
 | `cofre_missao` | listar, criar, atualizar |
+| `cofre_spec` | criar, ver, listar, adicionar, responder, aprovar, cancelar ([specs](08-specs-e-harness.md)) |
+| `cofre_tarefa` | proxima, iniciar, concluir (roda a verificação), bloquear, reabrir, regressao |
 
 O servidor implementa o transporte stdio do MCP (JSON-RPC por linha), negocia as versões `2024-11-05` a `2025-11-25`, expõe `instructions` no `initialize` e consulta `roots/list` quando o cliente oferece, para descobrir o workspace.
 
@@ -105,6 +109,8 @@ O servidor implementa o transporte stdio do MCP (JSON-RPC por linha), negocia as
 Documentação oficial lida nos repositórios em outubro de 2026:
 - Hermes Agent: `website/docs/user-guide/which-file-does-what.md`, `features/memory.md`, `features/context-files.md`, `features/hooks.md`, `features/plugins.md`, `features/skills.md`, `reference/mcp-config-reference.md`, `reference/cli-commands.md` em [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent).
 - OpenCode V2 (2.0.26): `instructions.mdx`, `skills.mdx`, `commands.mdx`, `compaction.mdx`, `mcp-servers.mdx`, `plugins.mdx`, `build/plugins/index.mdx`, `build/plugins/migrate-v1.mdx`, `migrate-v1.mdx` em [sst/opencode](https://github.com/sst/opencode).
-- Obsidian Bases: `Bases syntax.md`, `Views.md`, `Functions.md` em [obsidianmd/obsidian-help](https://github.com/obsidianmd/obsidian-help).
+- Obsidian Bases: `Bases syntax.md`, `Views.md`, `Functions.md`, `Layouts/Kanban view.md` em [obsidianmd/obsidian-help](https://github.com/obsidianmd/obsidian-help).
+- Código do OpenCode V2 para timeouts e agentes: `packages/core/src/mcp/client.ts` (timeout de execução padrão de 12 h), `packages/core/src/v1/config/migrate.ts` (migração de agentes V1), `packages/core/src/session/model-request.ts` (prompt de agente substitui o prompt base).
+- Código do Hermes para timeouts e personalities: `tools/mcp_tool_common.py` (timeout de chamada padrão de 300 s), `hermes_cli/personality.py`, `hermes_cli/config.py` (`config set` com valor JSON).
 
 Essas ferramentas mudam rápido. Se uma atualização quebrar algo, o ponto mais sensível é a API de plugins (o OpenCode já trocou a dele na V2); o MCP, as skills e os comandos são as partes mais estáveis.

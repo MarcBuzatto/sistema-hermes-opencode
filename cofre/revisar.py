@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 
@@ -11,7 +12,7 @@ from .contexto import vencido
 from .projetos import bases_de_arquivos
 from .registrar import Autor, _corpo_fato, _linha_hist
 from .vault import (
-    PASTAS, STATUS_DECISAO, STATUS_FATO, STATUS_MISSAO, Cofre, Nota, escrever_atomico, hoje, ler_nota,
+    PASTAS, STATUS_DECISAO, STATUS_FATO, STATUS_MISSAO, STATUS_SPEC, Cofre, Nota, escrever_atomico, hoje, ler_nota,
     lista, para_data, secoes,
 )
 
@@ -114,12 +115,33 @@ def revisar(cofre: Cofre, projeto: str | None = None, conferir_evidencias: bool 
             achados.append(Achado("alerta", _rotulo(n), "decisão ACEITA sem citação do usuário"))
         if n.tipo == "missao" and n.status not in STATUS_MISSAO:
             achados.append(Achado("erro", _rotulo(n), f"status de missão inválido '{n.status}'"))
+        if n.tipo == "spec":
+            achados += _revisar_spec(n)
         if n.tipo == "captura" and n.status == "pendente":
             achados.append(Achado("info", _rotulo(n), f"captura pendente de triagem na inbox: {n.caminho.stem}"))
     if not projeto:
         achados += [Achado(g, n, m) for g, n, m in skills_mod.verificar(cofre.raiz)]
     achados.sort(key=lambda a: (GRAVIDADE.get(a.gravidade, 9), a.nota))
     return achados
+
+
+def _revisar_spec(n: Nota) -> list[Achado]:
+    from . import specs
+
+    rot, s, saida = _rotulo(n), specs.carregar(n), []
+    if n.status not in STATUS_SPEC:
+        return [Achado("erro", rot, f"status de spec inválido '{n.status}' (use {', '.join(STATUS_SPEC)})")]
+    if n.status in ("aprovada", "em_execucao", "concluida") and s.alterada_apos_aprovacao():
+        saida.append(Achado("alerta", rot, "requisitos/tarefas mudaram depois da aprovação; precisa de nova aprovação"))
+    if n.status != "rascunho" and not n.meta.get("citacao_usuario") and "pelo usuário" not in s.historico:
+        saida.append(Achado("alerta", rot, "spec aprovada sem citação do usuário"))
+    abertas = [t.id for t in s.tarefas if t.estado not in ("concluida", "cancelada")]
+    if n.status == "concluida" and abertas:
+        saida.append(Achado("alerta", rot, f"spec marcada como concluída com tarefas abertas: {', '.join(abertas)}"))
+    for t in s.tarefas:
+        if t.estado == "concluida" and not re.search(rf"\b{t.id} concluída\b", s.historico):
+            saida.append(Achado("alerta", rot, f"{t.id} marcada como pronta direto na nota, sem a verificação do cofre"))
+    return saida
 
 
 def _marcar_contestado(cofre: Cofre, nota: Nota, motivo: str) -> None:

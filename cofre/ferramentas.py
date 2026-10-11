@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from . import contexto, registrar
+from . import contexto, registrar, specs
 from .registrar import Autor
 from .vault import Cofre
 
@@ -123,6 +123,44 @@ def _missao(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
                                           adicionar_passo=a.get("adicionar_passo"), status=a.get("status"),
                                           nota_log=a.get("nota")).texto()
     return "acao deve ser 'listar', 'criar' ou 'atualizar'."
+
+
+def _spec(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
+    acao = (a.get("acao") or "ver").lower()
+    cwd = a.get("cwd") or cwd
+    if acao == "listar":
+        return specs.listar(cofre, projeto=a.get("projeto"), cwd=cwd)
+    if acao == "criar":
+        return specs.criar(cofre, autor, a.get("titulo", ""), a.get("objetivo", ""), requisitos=a.get("requisitos"),
+                           tarefas=a.get("tarefas"), perguntas=a.get("perguntas"), fora_escopo=a.get("fora_escopo"),
+                           plano=a.get("plano", ""), projeto=a.get("projeto"), cwd=cwd).texto()
+    return specs.atualizar(cofre, autor, acao, a.get("spec"), cwd=cwd, projeto=a.get("projeto"),
+                           requisitos=a.get("requisitos"), tarefas=a.get("tarefas"), perguntas=a.get("perguntas"),
+                           fora_escopo=a.get("fora_escopo"), plano=a.get("plano"), pergunta=a.get("pergunta"),
+                           resposta=a.get("resposta", ""), citacao_usuario=a.get("citacao_usuario", ""),
+                           motivo=a.get("motivo", "")).texto()
+
+
+def _tarefa(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
+    return specs.tarefa(cofre, autor, a.get("acao", ""), a.get("spec"), a.get("tarefa"), cwd=a.get("cwd") or cwd,
+                        projeto=a.get("projeto"), motivo=a.get("motivo", ""),
+                        citacao_usuario=a.get("citacao_usuario", "")).texto()
+
+
+_TAREFAS = {
+    "type": "array",
+    "description": "Tarefas pequenas, em ordem. 'verificar' = comando que sai com código 0 quando a tarefa está pronta "
+                   "(ex.: 'npm test -- login', 'pytest tests/test_login.py', 'go test ./auth/...') ou 'manual'.",
+    "items": {
+        "type": "object",
+        "properties": {
+            "descricao": {"type": "string"},
+            "cobre": {"type": "array", "items": {"type": "string"}, "description": "Requisitos cobertos, ex.: ['R1']"},
+            "verificar": {"type": "string"},
+        },
+        "required": ["descricao", "verificar"],
+    },
+}
 
 
 FERRAMENTAS: list[dict[str, Any]] = [
@@ -285,6 +323,51 @@ FERRAMENTAS: list[dict[str, Any]] = [
         }, ["acao"]),
         "handler": _missao,
     },
+    {
+        "name": "cofre_spec",
+        "description": (
+            "Spec (o que construir, antes de codar). criar: titulo, objetivo, requisitos ('QUANDO <situação>, O SISTEMA "
+            "DEVE <comportamento>'), tarefas (cada uma com 'verificar'), perguntas para o usuário. ver: mostra a spec e o "
+            "próximo passo. adicionar: mais requisitos/tarefas/perguntas/plano. responder: resposta do usuário a uma "
+            "pergunta (P1). aprovar: só com citacao_usuario (palavras exatas do usuário). Sem aprovação, não implemente."
+        ),
+        "inputSchema": _objeto({
+            "acao": {"type": "string", "enum": ["criar", "ver", "listar", "adicionar", "responder", "aprovar", "cancelar"]},
+            "spec": {"type": "string", "description": "ID da spec (E-XXXXX). Omita para usar a spec ativa do projeto."},
+            "titulo": {"type": "string"},
+            "objetivo": {"type": "string", "description": "Problema e resultado esperado, em 1 a 3 frases."},
+            "requisitos": _LISTA,
+            "tarefas": _TAREFAS,
+            "perguntas": {**_LISTA, "description": "Dúvidas que só o usuário responde. Pergunte em vez de supor."},
+            "fora_escopo": _LISTA,
+            "plano": {"type": "string", "description": "Como fazer: arquivos, abordagem, riscos."},
+            "pergunta": {"type": "string", "description": "Para responder: ID da pergunta (P1)."},
+            "resposta": {"type": "string"},
+            "citacao_usuario": {"type": "string"},
+            "motivo": {"type": "string"},
+            "projeto": _PROJETO,
+            "cwd": _CWD,
+        }, ["acao"]),
+        "handler": _spec,
+    },
+    {
+        "name": "cofre_tarefa",
+        "description": (
+            "Executa a spec aprovada, uma tarefa por vez. proxima: começa a próxima tarefa. concluir: o cofre RODA o "
+            "comando de verificação; só fica pronta se passar (3 falhas = bloqueada). bloquear: com motivo. reabrir: "
+            "com citacao_usuario. regressao: roda de novo todas as verificações. Nunca diga que terminou sem concluir aqui."
+        ),
+        "inputSchema": _objeto({
+            "acao": {"type": "string", "enum": ["proxima", "iniciar", "concluir", "bloquear", "reabrir", "regressao"]},
+            "spec": {"type": "string", "description": "ID da spec (E-XXXXX). Omita para usar a spec ativa do projeto."},
+            "tarefa": {"type": "string", "description": "ID da tarefa (T1). Omita para a tarefa em andamento."},
+            "motivo": {"type": "string"},
+            "citacao_usuario": {"type": "string", "description": "Palavras do usuário (verificação manual ou reabrir)."},
+            "projeto": _PROJETO,
+            "cwd": _CWD,
+        }, ["acao"]),
+        "handler": _tarefa,
+    },
 ]
 
 POR_NOME = {f["name"]: f for f in FERRAMENTAS}
@@ -300,6 +383,11 @@ EXEMPLOS = {
     "cofre_decisao": '{"titulo": "Usar Drizzle", "decisao": "Drizzle em vez de Prisma"}',
     "cofre_projeto": '{"acao": "listar"}',
     "cofre_missao": '{"acao": "listar"}',
+    "cofre_spec": ('{"acao": "criar", "titulo": "Login com e-mail", "objetivo": "Usuário entra com e-mail e senha", '
+                   '"requisitos": ["QUANDO a senha estiver errada, O SISTEMA DEVE mostrar Credenciais inválidas"], '
+                   '"tarefas": [{"descricao": "Validar credenciais na rota /login", "cobre": ["R1"], '
+                   '"verificar": "npm test -- login"}]}'),
+    "cofre_tarefa": '{"acao": "concluir", "tarefa": "T1"}',
 }
 for _f in FERRAMENTAS:
     _f["exemplo"] = EXEMPLOS.get(_f["name"])

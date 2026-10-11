@@ -9,7 +9,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import __version__, contexto, notebooklm, registrar
+from . import __version__, contexto, notebooklm, registrar, specs
 from . import skills as skills_mod
 from .config import ErroCofre, arquivo_config_usuario, gravar_config_usuario, ler_config_usuario, resolver_vault
 from .registrar import Autor
@@ -51,7 +51,12 @@ def _dir_template() -> Path:
 
 # ---- comandos -------------------------------------------------------------
 def cmd_contexto(a):
-    _imprimir(contexto.montar(_cofre(a), cwd=a.cwd or os.getcwd(), projeto=a.projeto, max_chars=a.max, modo=a.modo))
+    texto = contexto.montar(_cofre(a), cwd=a.cwd or os.getcwd(), projeto=a.projeto, max_chars=a.max, modo=a.modo)
+    if (a.agente_ativo or "").strip().lower() == "spec":
+        texto = (texto + "\n\n" + specs.INSTRUCOES_MODO_SPEC).strip()
+    if a.sem_checkpoint:
+        texto = "\n\n".join(x for x in (texto, contexto.lembrete_checkpoint(_cofre(a), a.sem_checkpoint)) if x)
+    _imprimir(texto)
 
 
 def cmd_buscar(a):
@@ -155,6 +160,39 @@ def cmd_missao(a):
     else:
         _imprimir(registrar.missao_atualizar(cofre, _autor(a), a.alvo or "", concluir_passo=a.concluir,
                                              adicionar_passo=a.adicionar, status=a.status, nota_log=a.nota).texto())
+
+
+def cmd_spec(a):
+    cofre = _cofre(a)
+    cwd = a.cwd or os.getcwd()
+    if a.acao == "listar":
+        _imprimir(specs.listar(cofre, projeto=a.projeto, cwd=cwd))
+    elif a.acao == "criar":
+        _imprimir(specs.criar(cofre, _autor(a), a.alvo or "", a.objetivo or "", requisitos=a.requisito,
+                              tarefas=a.tarefa, perguntas=a.pergunta, fora_escopo=a.fora, plano=a.plano or "",
+                              projeto=a.projeto, cwd=cwd).texto())
+    else:
+        _imprimir(specs.atualizar(cofre, _autor(a), a.acao, a.alvo, cwd=cwd, projeto=a.projeto, requisitos=a.requisito,
+                                  tarefas=a.tarefa, perguntas=a.pergunta, fora_escopo=a.fora, plano=a.plano,
+                                  pergunta=a.p, resposta=a.resposta or "", citacao_usuario=a.citacao or "",
+                                  motivo=a.motivo or "").texto())
+
+
+def cmd_tarefa(a):
+    _imprimir(specs.tarefa(_cofre(a), _autor(a), a.acao, a.spec, a.alvo, cwd=a.cwd or os.getcwd(), projeto=a.projeto,
+                           motivo=a.motivo or "", citacao_usuario=a.citacao or "").texto())
+
+
+def cmd_agents_md(a):
+    from . import agentsmd
+
+    caminho = Path(a.caminho).expanduser() if a.caminho else agentsmd.caminho_padrao()
+    if not caminho:
+        raise ErroCofre("Não achei AGENTS.md (procurei em ~/.config/opencode e no diretório atual). Passe o caminho.")
+    if a.acao == "analisar":
+        _imprimir(agentsmd.analisar(caminho))
+    else:
+        _imprimir(agentsmd.dividir(_cofre(a), caminho, aplicar=a.aplicar, manter=a.manter or []))
 
 
 def cmd_revisar(a):
@@ -333,6 +371,8 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("--projeto")
     sp.add_argument("--max", type=int)
     sp.add_argument("--modo", choices=["completo", "sistema", "ancora"], default="completo")
+    sp.add_argument("--agente-ativo", help="Agente em uso no cliente; 'spec' acrescenta as instruções do modo spec")
+    sp.add_argument("--sem-checkpoint", type=int, default=0, help="Mensagens do usuário desde o último checkpoint")
 
     sp = novo("buscar", cmd_buscar, "Busca notas no cofre")
     sp.add_argument("consulta")
@@ -430,6 +470,39 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("--adicionar")
     sp.add_argument("--status")
     sp.add_argument("--nota")
+
+    sp = novo("spec", cmd_spec, "Specs (SDD): criar | ver | listar | adicionar | responder | aprovar | cancelar", autor=True)
+    sp.add_argument("acao", choices=["criar", "ver", "listar", "adicionar", "responder", "aprovar", "cancelar"])
+    sp.add_argument("alvo", nargs="?", help="Título (criar) ou ID da spec (E-XXXXX); omitido = spec ativa do projeto")
+    sp.add_argument("--objetivo")
+    sp.add_argument("--requisito", action="append", help="'QUANDO <situação>, O SISTEMA DEVE <comportamento>'")
+    sp.add_argument("--tarefa", action="append", help="'descrição | verificar: npm test | cobre: R1'")
+    sp.add_argument("--pergunta", action="append", help="Pergunta em aberto (criar/adicionar)")
+    sp.add_argument("--fora", action="append", help="Fora de escopo")
+    sp.add_argument("--plano")
+    sp.add_argument("--p", help="responder: ID da pergunta (P1)")
+    sp.add_argument("--resposta")
+    sp.add_argument("--citacao", help="Palavras do usuário (quando quem roda é um agente)")
+    sp.add_argument("--motivo")
+    sp.add_argument("--projeto")
+    sp.add_argument("--cwd")
+
+    sp = novo("tarefa", cmd_tarefa, "Tarefas da spec: proxima | iniciar | concluir | bloquear | reabrir | regressao",
+              autor=True)
+    sp.add_argument("acao", choices=["proxima", "iniciar", "concluir", "bloquear", "reabrir", "regressao"])
+    sp.add_argument("alvo", nargs="?", help="ID da tarefa (T1); omitido = a tarefa em andamento")
+    sp.add_argument("--spec", help="ID da spec (E-XXXXX); omitido = spec ativa do projeto")
+    sp.add_argument("--motivo")
+    sp.add_argument("--citacao")
+    sp.add_argument("--projeto")
+    sp.add_argument("--cwd")
+
+    sp = novo("agents-md", cmd_agents_md,
+              "AGENTS.md grande: analisar | dividir (seções específicas viram notas do vault; o original não muda)")
+    sp.add_argument("acao", choices=["analisar", "dividir"])
+    sp.add_argument("caminho", nargs="?", help="Padrão: ~/.config/opencode/AGENTS.md ou ./AGENTS.md")
+    sp.add_argument("--aplicar", action="store_true", help="dividir: grava as notas e a proposta (sem isso, só mostra)")
+    sp.add_argument("--manter", action="append", help="dividir: título de seção que deve ficar no núcleo")
 
     sp = novo("revisar", cmd_revisar, "Revisa integridade, validade, evidências e segredos")
     sp.add_argument("--projeto")

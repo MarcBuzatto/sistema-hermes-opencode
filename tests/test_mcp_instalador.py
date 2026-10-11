@@ -42,7 +42,7 @@ class TestMCP(CofreTeste):
         self.assertIn(por_id[1]["result"]["protocolVersion"], ("2025-06-18",))
         self.assertTrue(any(m.get("method") == "roots/list" for m in respostas))
         nomes = [t["name"] for t in por_id[2]["result"]["tools"]]
-        self.assertEqual(len(nomes), 10)
+        self.assertEqual(len(nomes), 12)
         self.assertFalse(por_id[3]["result"]["isError"], por_id[3])
         self.assertIn("projeto loja", por_id[3]["result"]["content"][0]["text"])
         self.assertTrue(por_id[4]["result"]["isError"])
@@ -98,12 +98,17 @@ class TestInstalador(CofreTeste):
         self.assertTrue((sincronizada / ".cofre-sync").exists(), "OpenCode sem versão detectada recebe cópia (V1)")
         plugin = (oc / "plugins" / "cofre.js").read_text(encoding="utf-8")
         self.assertNotIn("{{", plugin)
+        self.assertIn("[cofre]", (oc / "agents" / "spec.md").read_text(encoding="utf-8"))
+        self.assertIn("agent: spec", (oc / "commands" / "proxima.md").read_text(encoding="utf-8"))
+        self.assertEqual(cfg["mcp"]["cofre"]["timeout"], 1200000, "V1: timeout longo para a verificação de tarefas")
+        self.assertTrue((vault / "60-Skills" / "sistema" / "cofre-sdd" / "SKILL.md").exists())
 
         self.rodar(env, "--desinstalar")
         self.assertEqual((oc / "AGENTS.md").read_text(encoding="utf-8"), agents)
         cfg = json.loads((oc / "opencode.json").read_text(encoding="utf-8"))
         self.assertNotIn("mcp", cfg)
         self.assertFalse(sincronizada.exists())
+        self.assertFalse((oc / "agents" / "spec.md").exists())
         self.assertTrue((oc / "skills" / "minha-skill" / "SKILL.md").exists(), "skill do usuário preservada")
         self.assertTrue((vault / "00-Sistema" / "Perfil.md").exists())
 
@@ -124,10 +129,32 @@ class TestInstalador(CofreTeste):
         cfg = json.loads((oc / "opencode.json").read_text(encoding="utf-8"))
         self.assertEqual(cfg["skills"], [str(vault.resolve() / "60-Skills")])
         self.assertFalse(cfg["mcp"]["servers"]["cofre"]["codemode"])
+        self.assertNotIn("timeout", cfg["mcp"]["servers"]["cofre"], "V2 já tem 12 h de padrão; a chave V1 reduziria")
         self.assertFalse((oc / "skills").exists())
         self.rodar(env, "--desinstalar")
         cfg = json.loads((oc / "opencode.json").read_text(encoding="utf-8"))
         self.assertNotIn("skills", cfg)
+
+    @unittest.skipIf(os.name == "nt", "binário falso em shell script")
+    def test_hermes_recebe_timeout_e_personality_spec(self):
+        home = self.tmp / "home"
+        (home / ".hermes").mkdir(parents=True)
+        binarios = self.tmp / "bin"
+        binarios.mkdir()
+        registro = self.tmp / "hermes.log"
+        falso = binarios / "hermes"
+        falso.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{registro}"\n'
+                         'if [ "$2" = "get" ]; then echo null; fi\n', encoding="utf-8")
+        falso.chmod(0o755)
+        env = self.ambiente(home)
+        env["PATH"] = str(binarios) + os.pathsep + env["PATH"]
+        self.rodar(env, "--vault", str(home / "Cofre"), "--sem-opencode", "--sem-path")
+        chamadas = registro.read_text(encoding="utf-8")
+        self.assertIn('"timeout": 1200', chamadas)
+        linha = next(x for x in chamadas.splitlines() if x.startswith("config set agent.personalities.spec "))
+        valor = json.loads(linha.split(" ", 3)[3])
+        self.assertIn("[cofre]", valor["description"])
+        self.assertIn("MODO SPEC", valor["system_prompt"])
 
 
 if __name__ == "__main__":

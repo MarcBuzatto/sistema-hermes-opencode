@@ -18,6 +18,9 @@
 ## Missões
 ![[Missoes.base#Quadro]]
 
+## Specs
+![[Specs.base#Quadro]]
+
 ## Sessões recentes
 ![[Sessoes.base#Recentes]]
 

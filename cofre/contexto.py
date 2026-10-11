@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date
 
 from . import epistemica as ep
+from . import specs
 from .projetos import resolver_projeto
 from .vault import Cofre, Nota, agora, alvo_link, lista, para_data, secao
 
@@ -34,6 +35,7 @@ REGRAS = [
     "Usuário corrigiu ou o código contradiz o cofre? cofre_atualizar_fato (refutar/contestar). Corrigir só na conversa não basta.",
     "Decisão de projeto: cofre_decisao (fica 'aceita' só com as palavras do usuário).",
     "Fim de etapa, conversa longa ou antes de encerrar: cofre_checkpoint.",
+    "Pedido grande (várias etapas ou arquivos): proponha uma spec (cofre_spec) e espere a aprovação do usuário. Tarefa de spec só termina com cofre_tarefa(acao='concluir'), que roda a verificação.",
     "Bloco '[cofre] Possivelmente relevante' = o vault tem algo ligado à mensagem: abra (cofre_ler ou skill) só o que servir. Sem ele, cofre_buscar antes de afirmar o que não está aqui.",
     "Nunca grave senhas, tokens ou chaves. Procedimento completo: skill cofre-protocolo.",
 ]
@@ -150,7 +152,9 @@ def _secao_perfil(cofre: Cofre, limite: int) -> list[str]:
 
 
 def montar(cofre: Cofre, cwd: str | None = None, projeto: str | None = None, max_chars: int | None = None,
-           modo: str = "completo") -> str:
+           modo: str = "completo", incluir_agora: bool = True) -> str:
+    """incluir_agora=False: para prompts montados uma vez por sessão (Hermes), em que a linha AGORA
+    ficaria velha; nesses clientes ela vai junto com cada mensagem."""
     cfg = cofre.config()
     sistema = modo == "sistema"
     maximo = int(max_chars or (cfg["contexto_sistema_max_chars"] if sistema else cfg["contexto_max_chars"]))
@@ -178,6 +182,9 @@ def montar(cofre: Cofre, cwd: str | None = None, projeto: str | None = None, max
             rod = f"(atualizado {estado.meta.get('atualizado', '?')} por {por}" + (
                 ")" if por == "usuario" else " — escrito por agente, confira no código)")
             secoes.append(_Secao("Estado atual", itens, prioridade=1, minimo=1, rodape=rod))
+        agora_spec = specs.linha_agora(cofre, slug_p) if incluir_agora else ""
+        if agora_spec:
+            secoes.insert(0, _Secao("AGORA", [agora_spec], prioridade=0, minimo=1))
     else:
         cab = ["# COFRE · contexto geral (nenhum projeto associado a este diretório)",
                ("" if sistema else f"Gerado {agora()} · ") + f"vault: {cofre.raiz}"]
@@ -218,10 +225,41 @@ def montar(cofre: Cofre, cwd: str | None = None, projeto: str | None = None, max
     return _ajustar("\n".join(cab), secoes, maximo)
 
 
+def mensagens_sem_checkpoint(mensagens) -> int:
+    """Mensagens do usuário desde a última chamada a cofre_checkpoint (formatos OpenAI, OpenCode V1 e V2)."""
+    n = 0
+    for m in mensagens or []:
+        if not isinstance(m, dict):
+            continue
+        papel = m.get("role") or (m.get("info") or {}).get("role")
+        conteudo = m.get("content") if "content" in m else m.get("parts")
+        partes = conteudo if isinstance(conteudo, list) else [conteudo]
+        nomes = [str(((c or {}).get("function") or {}).get("name", "")) for c in m.get("tool_calls") or []]
+        nomes += [str(p.get("name") or p.get("tool") or "") for p in partes
+                  if isinstance(p, dict) and p.get("type") in ("tool-call", "tool", "tool_use")]
+        if papel == "user" and any(isinstance(p, str) and p.strip() or isinstance(p, dict) and p.get("type") == "text"
+                                   and not p.get("synthetic") for p in partes):
+            n += 1
+        if any("cofre_checkpoint" in nome for nome in nomes):
+            n = 0
+    return n
+
+
+def lembrete_checkpoint(cofre: Cofre, sem_checkpoint: int) -> str:
+    limite = int(cofre.config().get("lembrete_checkpoint_mensagens", 8) or 0)
+    if limite <= 0 or sem_checkpoint < limite:
+        return ""
+    return (f"[cofre] {sem_checkpoint} mensagens do usuário sem checkpoint nesta conversa: ao terminar a etapa atual, "
+            "chame cofre_checkpoint (resumo, feito, proximos_passos).")
+
+
 def ancora(cofre: Cofre, proj: Nota | None) -> str:
     if not proj:
         return ("[cofre] Sem projeto associado. Lembrete: fatos novos -> cofre_registrar_fato; "
                 "correções -> cofre_atualizar_fato; fim de etapa -> cofre_checkpoint.")
+    agora_spec = specs.linha_agora(cofre, proj.nome)
+    if agora_spec:
+        return f"[cofre · {proj.nome}] {agora_spec} · Não trate hipótese como fato; checkpoint ao fim da etapa."
     estado = cofre.estado(proj.nome)
     foco = _curto(secao(estado.corpo, "Foco atual"), 160) if estado else "(sem estado)"
     prox = []

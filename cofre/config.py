@@ -23,9 +23,14 @@ PADROES_VAULT = {
     "contexto_sistema_max_chars": 3500,
     "fatos_verificados_no_contexto": 15,
     "lembrar_checkpoint_apos_turnos": 4,
+    "lembrete_checkpoint_mensagens": 8,
     "relevancia_ativa": True,
     "relevancia_max_itens": 5,
     "relevancia_max_chars": 1600,
+    # Specs: tempo máximo de cada comando de verificação (s) e comandos extras que o cofre pode
+    # rodar além dos de teste/lint/build conhecidos (prefixos exatos, ex.: "docker compose run --rm api pytest").
+    "verificacao_timeout": 300,
+    "verificacao_comandos": [],
 }
 
 

@@ -32,6 +32,10 @@ WIN = os.name == "nt"
 INICIO = "### >>> COFRE (bloco gerenciado pelo instalador do cofre; edite fora dele) >>>"
 FIM = "### <<< COFRE <<<"
 MARCA_COMANDO = "[cofre]"
+# Timeout de chamada de ferramenta MCP pedido aos clientes: cobre a verificação de uma tarefa de spec
+# (verificacao_timeout, padrão 300 s) mais a regressão (até 2x isso).
+TIMEOUT_MCP_S = 1200
+PERSONALITY_HERMES = "spec"
 
 
 def _home_dados() -> Path:
@@ -209,8 +213,10 @@ class Instalador:
             return
         versao = self.versao_opencode()
         destino_sync = None if (versao and versao >= 2) else self.opencode_dir / "skills"
-        for arq in sorted((RAIZ / "adapters" / "opencode" / "commands").glob("*.md")):
-            destino = self.opencode_dir / "commands" / arq.name
+        arquivos = [(arq, self.opencode_dir / pasta / arq.name)
+                    for pasta in ("commands", "agents")
+                    for arq in sorted((RAIZ / "adapters" / "opencode" / pasta).glob("*.md"))]
+        for arq, destino in arquivos:
             existente = destino.read_text(encoding="utf-8") if destino.exists() else ""
             if existente and MARCA_COMANDO not in existente:
                 self.aviso(f"{destino} já existe e não é do cofre; mantive o seu.")
@@ -246,8 +252,10 @@ class Instalador:
             entrada = {"type": "local", "command": self.mcp_comando(),
                        "environment": {"COFRE_AGENTE": "opencode"}, "codemode": False}
         else:
+            # V1: timeout das requisições MCP (ms). O padrão curto mataria a verificação das tarefas de spec.
+            # Não vale para a V2, cujo padrão de execução já é 12 h (e a chave V1 o reduziria).
             entrada = {"type": "local", "command": self.mcp_comando(),
-                       "environment": {"COFRE_AGENTE": "opencode"}, "enabled": True}
+                       "environment": {"COFRE_AGENTE": "opencode"}, "enabled": True, "timeout": TIMEOUT_MCP_S * 1000}
         v2 = bool(versao and versao >= 2)
         pasta_skills = str(self.pasta_skills)
         if jsonc.exists() and not arq.exists():
@@ -330,7 +338,7 @@ class Instalador:
                     "`hermes config unset skills.create_dir` (se apontar para o vault) e remova 'cofre' de "
                     "plugins.enabled (mantendo os outros itens).")
         servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
-                    "env": {"COFRE_AGENTE": "hermes"}, "timeout": 60}
+                    "env": {"COFRE_AGENTE": "hermes"}, "timeout": TIMEOUT_MCP_S}
         listas = ["'cofre' em plugins.enabled"]
         if not self.a.manter_skill_obsidian:
             listas.append("'obsidian' em skills.disabled")
@@ -375,13 +383,14 @@ class Instalador:
         atual = str(atual) if atual else ""
         if remover:
             cmds = [["config", "unset", "mcp_servers.cofre"], mesclar("plugins.enabled", "cofre")]
+            cmds += self._personality_hermes(remover=True)
             if atual and self.vault and Path(os.path.expanduser(atual)) == self.pasta_skills:
                 cmds.append(["config", "unset", "skills.create_dir"])
             elif nossa in self._lista_hermes("skills.external_dirs"):
                 cmds.append(mesclar("skills.external_dirs", nossa))
             return cmds
         servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
-                    "env": {"COFRE_AGENTE": "hermes"}, "timeout": 60}
+                    "env": {"COFRE_AGENTE": "hermes"}, "timeout": TIMEOUT_MCP_S}
         cmds = [
             ["config", "set", "mcp_servers.cofre", json.dumps(servidor)],
             mesclar("plugins.enabled", "cofre"),
@@ -398,7 +407,27 @@ class Instalador:
             cmds.append(mesclar("skills.disabled", "obsidian"))
         if not self.a.manter_memoria_hermes:
             cmds.append(["config", "set", "memory.memory_enabled", "false"])
+        cmds += self._personality_hermes(remover=False)
         return cmds
+
+    def _personality_hermes(self, remover: bool) -> list[list[str]]:
+        """Personality 'spec' no Hermes (equivalente ao agente spec do OpenCode): /personality spec."""
+        atual = self._valor_hermes(f"agent.personalities.{PERSONALITY_HERMES}")
+        nossa = isinstance(atual, dict) and MARCA_COMANDO in str(atual.get("description", ""))
+        if atual and not nossa:
+            if not remover:
+                self.aviso(f"Já existe a personality '{PERSONALITY_HERMES}' no Hermes; mantive a sua.")
+            return []
+        if remover:
+            return [["config", "unset", f"agent.personalities.{PERSONALITY_HERMES}"]] if nossa else []
+        if str(RAIZ) not in sys.path:
+            sys.path.insert(0, str(RAIZ))
+        from cofre.specs import INSTRUCOES_MODO_SPEC
+
+        valor = {"description": f"{MARCA_COMANDO} Spec-Driven Development com o cofre: especifica, espera aprovação, "
+                                "uma tarefa por vez com verificação",
+                 "system_prompt": INSTRUCOES_MODO_SPEC}
+        return [["config", "set", f"agent.personalities.{PERSONALITY_HERMES}", json.dumps(valor, ensure_ascii=False)]]
 
     # ---- opcionais: Claude Code CLI e Codex CLI -----------------------------
     def claude_code(self, remover: bool = False) -> None:
@@ -428,7 +457,7 @@ class Instalador:
         bloco = (
             "\n# cofre:inicio\n[mcp_servers.cofre]\n"
             f"command = '{self.python}'\nargs = ['{self.app}', 'mcp']\n"
-            "env = { COFRE_AGENTE = 'codex' }\n# cofre:fim\n"
+            f"env = {{ COFRE_AGENTE = 'codex' }}\ntool_timeout_sec = {TIMEOUT_MCP_S}\n# cofre:fim\n"
         )
         self.backup(cfg)
         self.escrever(cfg, limpo.rstrip("\n") + "\n" + bloco if limpo.strip() else bloco.lstrip("\n"))

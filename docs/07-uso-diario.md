@@ -15,8 +15,11 @@
 | Conversa ficou longa | `/checkpoint` (OpenCode) ou `/cofre-checkpoint` (Hermes) |
 | Vai trocar de assunto ou encerrar | Checkpoint antes |
 | Informação solta que não sabe onde encaixar | "joga na inbox do cofre" |
+| Feature ou mudança grande | OpenCode: `/spec <o que construir>` (ou Tab para o agente `spec`). Hermes: `/personality spec` e descreva. Responda as perguntas, revise requisitos e tarefas, diga "aprovado" |
+| Continuar uma spec | OpenCode: `/proxima`. Hermes: "continua a spec". A linha AGORA já diz à IA onde parou |
+| A IA diz que terminou | Só vale se `cofre_tarefa concluir` passou; veja a spec no Obsidian (aba Specs do projeto ou quadro no Início) |
 
-O Hermes avisa ao fechar uma sessão longa sem checkpoint.
+O Hermes avisa ao fechar uma sessão longa sem checkpoint, e os dois clientes lembram a IA de fazer checkpoint depois de 8 mensagens suas sem um (`lembrete_checkpoint_mensagens` no config).
 
 ## A IA lendo o que importa para o assunto
 
@@ -69,6 +72,12 @@ cofre exportar-notebooklm loja-acme
 cofre importar-notebooklm resposta.md --titulo "Briefing" --projeto loja-acme
 cofre skills listar
 cofre skills verificar
+cofre spec listar                               # specs do projeto atual
+cofre spec ver                                  # spec ativa, tarefas e próximo passo
+cofre spec aprovar --humano
+cofre tarefa concluir                           # roda a verificação da tarefa em andamento
+cofre agents-md analisar                        # quanto do seu AGENTS.md pode ir para o vault
+cofre agents-md dividir --aplicar
 cofre doctor
 ```
 

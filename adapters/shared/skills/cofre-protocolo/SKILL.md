@@ -61,6 +61,12 @@ A mensagem diz exatamente o que corrigir (trecho que não confere, afirmação j
 ## 8. Skills
 As skills do usuário ficam no vault em `60-Skills/` e aparecem para você como skills normais. Antes de seguir uma skill com status `rascunho` ou sem fonte, avise o usuário; ela pode conter informação não verificada.
 
+## 9. Specs (pedidos grandes)
+Pedido com várias etapas ou arquivos: siga a skill `cofre-sdd`. Em resumo: `cofre_spec` (requisitos QUANDO/DEVE, tarefas com comando de verificação), aprovação do usuário com as palavras dele, depois uma tarefa por vez com `cofre_tarefa`. Tarefa só termina com `cofre_tarefa(acao='concluir')`, que roda a verificação. Se houver linha **AGORA** no contexto, ela diz o que fazer agora.
+
+## 10. Instruções do usuário por assunto
+Linha "instrução sua: ..." no bloco de relevância = regra que o usuário escreveu para aquele assunto (veio do AGENTS.md dele). Se a tarefa envolve o assunto, leia com `cofre_ler` e siga.
+
 # Referência rápida
 
 ## Status de um fato

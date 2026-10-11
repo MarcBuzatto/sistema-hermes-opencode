@@ -237,3 +237,10 @@ def barrar_segredos(*textos: str) -> None:
                 "Conteúdo bloqueado: parece conter credencial (" + ", ".join(achados) + "). "
                 "Nunca grave segredos no cofre; registre só onde a credencial fica (ex.: 'variável STRIPE_KEY no .env')."
             )
+
+
+def mascarar_segredos(texto: str) -> str:
+    """Troca credenciais por um marcador (para saída de comandos guardada no cofre)."""
+    for _, rx in SEGREDOS_FORTES:
+        texto = rx.sub("[SEGREDO REMOVIDO]", texto or "")
+    return SEGREDO_FRACO[1].sub("[SEGREDO REMOVIDO]", texto)

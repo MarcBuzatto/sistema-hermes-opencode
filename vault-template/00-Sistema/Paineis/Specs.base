@@ -1,0 +1,31 @@
+filters:
+  and:
+    - 'tipo == "spec"'
+    - not:
+        - file.inFolder("00-Sistema")
+properties:
+  titulo:
+    displayName: Título
+views:
+  - type: kanban
+    name: Quadro
+    groupBy:
+      property: note.status
+      direction: ASC
+    groupOrder:
+      - rascunho
+      - aprovada
+      - em_execucao
+      - concluida
+      - cancelada
+    order:
+      - titulo
+      - projeto
+  - type: table
+    name: Tabela
+    order:
+      - titulo
+      - status
+      - projeto
+      - aprovada_em
+      - atualizada

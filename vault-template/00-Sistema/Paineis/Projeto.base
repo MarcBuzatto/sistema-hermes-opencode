@@ -59,3 +59,13 @@ views:
       - file.name
       - agente
       - atualizada
+  - type: table
+    name: Specs
+    filters:
+      and:
+        - 'tipo == "spec"'
+    order:
+      - titulo
+      - status
+      - aprovada_em
+      - atualizada

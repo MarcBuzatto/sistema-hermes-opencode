@@ -34,6 +34,8 @@ ALIASES_CHAVE = {
     "path": "caminho", "repository": "repo", "client": "cliente", "description": "descricao",
     "criticality": "criticidade", "force": "forcar", "limit": "limite", "type": "tipo", "model": "agente",
     "working_directory": "cwd", "workdir": "cwd", "diretorio": "cwd",
+    "answer": "resposta", "question": "pergunta", "out_of_scope": "fora_escopo", "fora_de_escopo": "fora_escopo",
+    "plan": "plano", "objetivo_spec": "objetivo", "verification": "verificar", "verify": "verificar",
 }
 
 ALIASES_VALOR = {
@@ -54,7 +56,13 @@ ALIASES_VALOR = {
     "read": "ler", "get": "ler", "cancel": "cancelar", "high": "alta", "normal_": "normal",
     "file": "arquivo", "command": "comando", "cmd": "comando", "user": "usuario", "note": "nota", "link_url": "url",
     "replace": "substituir", "append": "acrescentar", "adicionar": "acrescentar",
+    "show": "ver", "view": "ver", "mostrar": "ver", "add": "adicionar", "incluir": "adicionar",
+    "answer": "responder", "resposta": "responder", "reopen": "reabrir", "redo": "reabrir",
+    "aprovacao": "aprovar", "proxima_tarefa": "proxima", "comecar_tarefa": "iniciar",
 }
+# Quando o apelido geral não serve para a ferramenta (ex.: "adicionar" é "acrescentar" no
+# checkpoint mas "adicionar" no cofre_spec), tenta estes antes de desistir.
+_SEGUNDA_OPCAO = {"ler": "ver", "acrescentar": "adicionar", "listar": "ver"}
 
 _ID = re.compile(r"\b([FDSMCNE])-?([0-9A-HJKMNP-TV-Z]{5})\b", re.I)
 _VERDADEIRO = {"true", "sim", "yes", "1", "verdadeiro", "s", "y"}
@@ -97,10 +105,11 @@ def _como_lista(valor, itens_objeto: bool, virgula: bool = False) -> list:
 def _valor_enum(valor, opcoes: list[str]):
     if valor is None:
         return None
-    v = chave(valor)
-    v = ALIASES_VALOR.get(v, v)
-    if v in opcoes:
-        return v
+    original = chave(valor)
+    v = ALIASES_VALOR.get(original, original)
+    for candidato in (v, original, _SEGUNDA_OPCAO.get(v)):
+        if candidato in opcoes:
+            return candidato
     candidatos = [o for o in opcoes if o.startswith(v) or v.startswith(o)]
     return candidatos[0] if len(candidatos) == 1 else valor
 

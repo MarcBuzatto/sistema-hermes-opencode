@@ -35,11 +35,12 @@ IGNORAR_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".exportacoes"}
 STATUS_FATO = ("hipotese", "verificado", "contestado", "refutado", "obsoleto")
 STATUS_DECISAO = ("proposta", "aceita", "substituida", "rejeitada")
 STATUS_MISSAO = ("ativa", "pausada", "concluida", "cancelada")
+STATUS_SPEC = ("rascunho", "aprovada", "em_execucao", "concluida", "cancelada")
 TIPOS = (
     "fato", "decisao", "sessao", "estado", "projeto", "missao",
-    "captura", "cliente", "fonte", "perfil", "config",
+    "captura", "cliente", "fonte", "perfil", "config", "spec", "instrucao",
 )
-PREFIXOS = {"fato": "F", "decisao": "D", "sessao": "S", "missao": "M", "captura": "C", "fonte": "N"}
+PREFIXOS = {"fato": "F", "decisao": "D", "sessao": "S", "missao": "M", "captura": "C", "fonte": "N", "spec": "E"}
 _ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _LINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 
@@ -277,7 +278,7 @@ class Cofre:
         return self.raiz / PASTAS["projetos"] / slug_projeto
 
     def pasta_para(self, tipo: str, slug_projeto: str | None) -> Path:
-        sub = {"fato": "Fatos", "decisao": "Decisoes", "sessao": "Sessoes"}[tipo]
+        sub = {"fato": "Fatos", "decisao": "Decisoes", "sessao": "Sessoes", "spec": "Specs"}[tipo]
         if slug_projeto:
             return self.pasta_projeto(slug_projeto) / sub
         if tipo == "sessao":

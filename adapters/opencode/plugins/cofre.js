@@ -3,6 +3,10 @@
 //   sistema de cada chamada e no pedido de compactação.
 // - Relevância: procura no vault o que tem a ver com a última mensagem do usuário (notas,
 //   fatos, decisões, fontes, skills) e mostra poucas linhas apontando para isso.
+// - Agente "spec": acrescenta as instruções do modo spec sem trocar o prompt base.
+// - Lembrete de checkpoint depois de N mensagens do usuário sem cofre_checkpoint.
+// - O contexto fica em cache por 30 s, mas é refeito quando aparece chamada nova a uma
+//   ferramenta do cofre (a linha AGORA da spec muda a cada tarefa).
 // Gerado pelo instalador do cofre.
 import { execFile } from "node:child_process"
 
@@ -14,6 +18,7 @@ const cacheContexto = new Map()
 const cacheDiretorio = new Map()
 const cacheRelevancia = new Map()
 let ultimoTextoV1 = ""
+let estadoV1 = { agente: "", chamadasCofre: 0, semCheckpoint: 0 }
 
 const AVISO_COMPACTACAO =
   "Ao resumir esta conversa, preserve: os IDs do cofre citados (F-, D-, S-, M-), o status de cada informação " +
@@ -32,19 +37,48 @@ function rodar(args, entrada) {
   })
 }
 
+const papel = (m) => m?.role ?? m?.info?.role
+const partesDe = (m) => {
+  const partes = m?.content ?? m?.parts ?? []
+  return Array.isArray(partes) ? partes : [partes]
+}
+const textoDe = (m) =>
+  partesDe(m)
+    .map((p) => (typeof p === "string" ? p : p?.type === "text" && !p?.synthetic ? p.text : ""))
+    .join("\n")
+    .trim()
+const nomeFerramenta = (p) =>
+  p?.type === "tool-call" ? String(p?.name ?? "") : p?.type === "tool" ? String(p?.tool ?? "") : ""
+
 function textoDaUltimaMensagem(mensagens) {
   if (!Array.isArray(mensagens)) return ""
   for (let i = mensagens.length - 1; i >= 0; i--) {
-    const m = mensagens[i]
-    if ((m?.role ?? m?.info?.role) !== "user") continue
-    const partes = m?.content ?? m?.parts ?? []
-    const texto = (Array.isArray(partes) ? partes : [partes])
-      .map((p) => (typeof p === "string" ? p : p?.type === "text" && !p?.synthetic ? p.text : ""))
-      .join("\n")
-      .trim()
+    if (papel(mensagens[i]) !== "user") continue
+    const texto = textoDe(mensagens[i])
     if (texto) return texto.slice(0, 4000)
   }
   return ""
+}
+
+// Quantas chamadas a ferramentas do cofre houve (invalida o cache) e quantas mensagens do
+// usuário desde o último cofre_checkpoint. V1 também informa o agente em info.agent.
+function estadoDaConversa(mensagens) {
+  let chamadasCofre = 0
+  let semCheckpoint = 0
+  let agente = ""
+  for (const m of Array.isArray(mensagens) ? mensagens : []) {
+    if (papel(m) === "user") {
+      if (textoDe(m)) semCheckpoint++
+      agente = String(m?.info?.agent ?? m?.agent ?? agente)
+    }
+    for (const p of partesDe(m)) {
+      const nome = nomeFerramenta(p)
+      if (!nome.includes("cofre_")) continue
+      chamadasCofre++
+      if (nome.includes("cofre_checkpoint")) semCheckpoint = 0
+    }
+  }
+  return { agente, chamadasCofre, semCheckpoint }
 }
 
 async function relevancia(dir, texto) {
@@ -57,12 +91,17 @@ async function relevancia(dir, texto) {
   return bloco
 }
 
-async function contexto(dir) {
+async function contexto(dir, estado = {}) {
   if (!dir) return ""
-  const item = cacheContexto.get(dir)
+  const agente = String(estado.agente ?? "").toLowerCase()
+  const chave = [dir, agente, estado.chamadasCofre ?? 0, estado.semCheckpoint ?? 0].join("\u0000")
+  const item = cacheContexto.get(chave)
   if (item && Date.now() - item.t < TTL_MS) return item.texto
-  const texto = await rodar(["contexto", "--cwd", dir, "--modo", "sistema"])
-  cacheContexto.set(dir, { t: Date.now(), texto })
+  const args = ["contexto", "--cwd", dir, "--modo", "sistema", "--sem-checkpoint", String(estado.semCheckpoint ?? 0)]
+  if (agente) args.push("--agente-ativo", agente)
+  const texto = await rodar(args)
+  if (cacheContexto.size > 100) cacheContexto.clear()
+  cacheContexto.set(chave, { t: Date.now(), texto })
   return texto
 }
 
@@ -83,8 +122,9 @@ export default {
     await ctx.session.hook("context", async (event) => {
       try {
         const dir = await diretorioDaSessao(ctx, event.sessionID)
+        const estado = { ...estadoDaConversa(event.messages), agente: String(event.agent ?? "") }
         const [texto, relacionado] = await Promise.all([
-          contexto(dir),
+          contexto(dir, estado),
           relevancia(dir, textoDaUltimaMensagem(event.messages)),
         ])
         if (texto) event.system.push({ type: "text", text: texto })
@@ -106,11 +146,12 @@ export default {
       "experimental.chat.messages.transform": async (_entrada, saida) => {
         try {
           ultimoTextoV1 = textoDaUltimaMensagem(saida?.messages) || ultimoTextoV1
+          estadoV1 = estadoDaConversa(saida?.messages)
         } catch {}
       },
       "experimental.chat.system.transform": async (_entrada, saida) => {
         try {
-          const [texto, relacionado] = await Promise.all([contexto(dir), relevancia(dir, ultimoTextoV1)])
+          const [texto, relacionado] = await Promise.all([contexto(dir, estadoV1), relevancia(dir, ultimoTextoV1)])
           if (texto && Array.isArray(saida?.system)) saida.system.push(texto)
           if (relacionado && Array.isArray(saida?.system)) saida.system.push(relacionado)
         } catch {}

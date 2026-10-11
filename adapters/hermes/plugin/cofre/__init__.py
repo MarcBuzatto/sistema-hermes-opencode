@@ -4,8 +4,9 @@
   detectado pelo diretório da sessão.
 - pre_llm_call (toda mensagem): procura no vault o que tem a ver com o que o usuário acabou
   de escrever (notas, fatos, decisões, fontes, skills) e anexa poucas linhas apontando para
-  isso, sem repetir o que já foi mostrado na sessão. A cada N turnos também reinjeta uma
-  âncora curta com o foco atual (lido do disco).
+  isso, sem repetir o que já foi mostrado na sessão. Com spec ativa, anexa a linha AGORA
+  (spec, tarefa atual e próximo passo) em toda mensagem; sem spec, uma âncora com o foco
+  atual a cada N turnos. Depois de N mensagens sem checkpoint, anexa um lembrete.
 - post_tool_call + on_session_finalize: avisa ao fechar uma sessão longa sem checkpoint.
 
 Gerado pelo instalador do cofre; COFRE_APP aponta para a instalação do pacote.
@@ -41,12 +42,12 @@ def _cofre():
     return Cofre(resolver_vault())
 
 
-def _texto(cwd, modo):
+def _texto(cwd, modo, incluir_agora=True):
     try:
         _garantir_path()
         from cofre import contexto
 
-        return contexto.montar(_cofre(), cwd=cwd, modo=modo)
+        return contexto.montar(_cofre(), cwd=cwd, modo=modo, incluir_agora=incluir_agora)
     except Exception as e:
         log.warning("cofre: contexto indisponível: %s", e)
         return ""
@@ -76,6 +77,21 @@ def _relevante(session_id, texto):
         return ""
 
 
+def _ancora(cwd):
+    return _texto(cwd, "ancora")
+
+
+def _lembrete(historico):
+    try:
+        _garantir_path()
+        from cofre import contexto
+
+        return contexto.lembrete_checkpoint(_cofre(), contexto.mensagens_sem_checkpoint(historico or []))
+    except Exception as e:
+        log.warning("cofre: lembrete indisponível: %s", e)
+        return ""
+
+
 def _config(chave, padrao):
     try:
         return int(_cofre().config().get(chave, padrao))
@@ -88,25 +104,28 @@ def register(ctx):
         cwd = info.get("cwd") or os.getcwd()
         if info.get("session_id"):
             _cwd_sessao[info["session_id"]] = cwd
-        texto = _texto(cwd, "sistema")
+        texto = _texto(cwd, "sistema", incluir_agora=False)
         if not texto:
             return ""
         return (texto + "\n" + LINHA_HERMES)[:4000]
 
     ctx.register_system_prompt_section("cofre.contexto", secao, position="after_memory", max_chars=4000)
 
-    def por_mensagem(session_id=None, user_message="", is_first_turn=False, **kwargs):
+    def por_mensagem(session_id=None, user_message="", is_first_turn=False, conversation_history=None, **kwargs):
         n = _turnos.get(session_id, 0) + 1
         _turnos[session_id] = n
         partes = []
         bloco = _relevante(session_id, _texto_mensagem(user_message))
         if bloco:
             partes.append(bloco)
+        cwd = _cwd_sessao.get(session_id) or os.getcwd()
+        ancora = _ancora(cwd)
         intervalo = _config("ancora_a_cada_turnos", 5)
-        if not is_first_turn and intervalo > 0 and n % intervalo == 0:
-            texto = _texto(_cwd_sessao.get(session_id) or os.getcwd(), "ancora")
-            if texto:
-                partes.append(texto)
+        if ancora and ("AGORA ·" in ancora or (not is_first_turn and intervalo > 0 and n % intervalo == 0)):
+            partes.append(ancora)
+        lembrete = _lembrete(conversation_history)
+        if lembrete:
+            partes.append(lembrete)
         return {"context": "\n\n".join(partes)} if partes else None
 
     ctx.register_hook("pre_llm_call", por_mensagem)

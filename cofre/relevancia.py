@@ -277,7 +277,7 @@ class Achado:
 
 def _peso(doc: dict, projeto: str | None) -> float:
     tipo, status = doc.get("tipo"), doc.get("status")
-    peso = {"skill": 1.3, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1, "fonte": 1.0, "nota": 1.0,
+    peso = {"skill": 1.3, "instrucao": 1.3, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1, "fonte": 1.0, "nota": 1.0,
             "missao": 0.9, "cliente": 1.0, "projeto": 0.9, "sessao": 0.6, "captura": 0.5}.get(tipo, 0.9)
     if tipo == "fato":
         peso *= {"verificado": 1.15, "refutado": 1.15, "contestado": 1.0, "hipotese": 0.9, "obsoleto": 0.4}.get(status, 1)
@@ -399,6 +399,8 @@ def linha(a: Achado) -> str:
     tipo, st = d.get("tipo"), d.get("status")
     if tipo == "skill":
         return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir)"
+    if tipo == "instrucao":
+        return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: cofre_ler \"{a.rel}\""
     if tipo == "skill-ref":
         return f"- referência da skill `{d.get('skill')}`: {_curto(d['titulo'], 80)} — cofre_ler \"{a.rel}\""
     if tipo == "fato":
