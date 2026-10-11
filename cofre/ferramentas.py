@@ -138,11 +138,11 @@ FERRAMENTAS: list[dict[str, Any]] = [
     },
     {
         "name": "cofre_buscar",
-        "description": "Busca no cofre (fatos, decisões, sessões, missões). Cada resultado vem com o status. Use antes de afirmar algo sobre o projeto que não está no contexto.",
+        "description": "Busca no vault inteiro (notas livres, fatos, decisões, fontes, skills, sessões), tolerante a erro de digitação. Cada resultado vem com o status. Use antes de afirmar algo que não está no contexto.",
         "inputSchema": _objeto({
             "consulta": {"type": "string"},
             "projeto": _PROJETO,
-            "tipo": {"type": "string", "enum": ["fato", "decisao", "sessao", "missao", "projeto", "captura", "fonte", "qualquer"]},
+            "tipo": {"type": "string", "enum": ["fato", "decisao", "sessao", "missao", "projeto", "captura", "fonte", "skill", "nota", "qualquer"]},
             "status": _LISTA,
             "limite": {"type": "integer", "description": "Máximo de resultados (padrão 10)."},
         }, ["consulta"]),
@@ -151,7 +151,7 @@ FERRAMENTAS: list[dict[str, Any]] = [
     },
     {
         "name": "cofre_ler",
-        "description": "Lê uma nota completa do cofre pelo ID (ex.: F-7K3PQ, D-..., S-..., M-...) ou slug de projeto.",
+        "description": "Lê uma nota completa do vault pelo ID (ex.: F-7K3PQ, D-..., N-...), slug de projeto ou caminho relativo ao vault (ex.: \"30-Conhecimento/Pentest/Burp.md\").",
         "inputSchema": _objeto({"id": {"type": "string"}}, ["id"]),
         "annotations": {"readOnlyHint": True},
         "handler": _ler,

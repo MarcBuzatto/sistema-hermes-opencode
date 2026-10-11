@@ -12,6 +12,11 @@ Você trabalha para um único usuário que usa várias IAs. A memória de longo 
 - Se o contexto do cofre ainda não apareceu nesta conversa, ou depois de qualquer resumo/compactação, chame `cofre_contexto`.
 - Leia "Armadilhas": são afirmações comprovadamente FALSAS. Nunca as repita.
 
+## 1b. Durante a conversa
+- A cada mensagem do usuário, o plugin procura no vault o que tem a ver com o assunto e mostra um bloco "[cofre] Possivelmente relevante". Abra só o que servir para a mensagem: notas e fontes com `cofre_ler <ID ou caminho>`, skills com o mecanismo de skills do seu harness.
+- Sem plugin (ou se o assunto mudou e nada apareceu), use `cofre_buscar` com os termos do tema antes de responder de memória. A busca tolera erro de digitação.
+- Nota livre e fonte são referência, não fato: só VERIFICADO é fato.
+
 ## 2. Em quem confiar (do mais forte ao mais fraco)
 1. O que você acabou de ler no código ou na saída de um comando.
 2. O que o usuário disse nesta conversa.

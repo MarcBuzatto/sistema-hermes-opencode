@@ -23,6 +23,9 @@ PADROES_VAULT = {
     "contexto_sistema_max_chars": 3500,
     "fatos_verificados_no_contexto": 15,
     "lembrar_checkpoint_apos_turnos": 4,
+    "relevancia_ativa": True,
+    "relevancia_max_itens": 5,
+    "relevancia_max_chars": 1600,
 }
 
 

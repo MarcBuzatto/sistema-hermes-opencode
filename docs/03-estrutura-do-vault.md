@@ -72,6 +72,16 @@ Cada skill é uma pasta com `SKILL.md` (frontmatter `name`, igual ao nome da pas
 
 Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincronizar`. O painel `Skills.base` lista todas.
 
+## Notas livres e busca por relevância
+
+Qualquer nota Markdown fora de `00-Sistema/` entra na busca, mesmo sem `tipo` nem frontmatter: suas anotações em `30-Conhecimento`, `40-Clientes`, `50-Fontes` etc. A cada mensagem, os plugins procuram ali o que tem a ver com o assunto e apontam para a IA (detalhes em [01-arquitetura.md](01-arquitetura.md)). Para uma nota ser achada:
+
+- título descritivo (o título pesa 3x o corpo);
+- `tags` e `aliases` com os nomes que você usa para o assunto, inclusive em outro idioma ou abreviado (ex.: `aliases: [teste de intrusão, pentest, pentesting]`), porque a busca é por palavras, não por sinônimos;
+- um assunto por nota funciona melhor que uma nota gigante.
+
+O índice fica em `.cofre/indice.json` (pasta oculta, ignorada pelo Obsidian e pelo git). Pode apagar à vontade; ele é refeito.
+
 ## Painéis (Bases)
 
 Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.base` ficam em `00-Sistema/Paineis/` e excluem `00-Sistema/` dos resultados globais.

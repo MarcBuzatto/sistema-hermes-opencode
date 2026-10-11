@@ -68,6 +68,7 @@ flowchart TB
 | Servidor MCP | Interface dos agentes. Mesmo binário para Hermes, OpenCode, Claude Code e Codex. Descobre o workspace por `roots/list` quando o cliente oferece. |
 | Plugins | Injetam o contexto sem depender do modelo: no Hermes como seção do prompt de sistema (estável, sobrevive à compactação) mais uma âncora periódica; no OpenCode em toda chamada e no pedido de compactação. |
 | Protocolo | 9 regras curtas dentro do pacote de contexto que os plugins injetam; versão completa na skill `cofre-protocolo`; resumo nas instruções do servidor MCP (para clientes sem plugin). Nenhum arquivo de instruções do usuário é editado. |
+| Relevância | `cofre/relevancia.py`: busca no vault inteiro a cada mensagem e devolve no máximo 5 itens (configurável) com status; mesmo motor do `cofre_buscar`. |
 | Skills | Ficam no vault (`60-Skills/`, formato Agent Skills). Hermes lê e cria skills lá (`skills.create_dir`); OpenCode V2 lê pelo campo `skills`; no V1 o plugin copia para `~/.config/opencode/skills` ao iniciar. As do cofre ficam em `60-Skills/sistema/`. |
 
 ## Fluxos
@@ -76,6 +77,19 @@ flowchart TB
 1. Você abre o agente numa pasta de código.
 2. O plugin descobre o projeto pelo diretório (campo `caminhos` do hub do projeto ou remoto git em `repos`; caminhos Windows e WSL são equivalentes).
 3. O pacote de contexto entra no prompt: estado atual, armadilhas, contestados, verificados, decisões, hipóteses, missões, suas preferências e as regras.
+
+### Cada mensagem: o que o vault tem sobre o assunto
+1. Você escreve, por exemplo, "vamos fazer o penteast do cliente".
+2. O plugin (Hermes: `pre_llm_call`; OpenCode: hook `context`) manda o texto da mensagem para `cofre relevante`.
+3. O motor busca no vault inteiro (notas livres, fatos, decisões, fontes do NotebookLM, skills e referências de skills), com ranqueamento BM25 e tolerância a erro de digitação, usando um índice em cache (`.cofre/indice.json`, atualizado só para arquivos alterados).
+4. Se houver algo forte o bastante, a IA recebe um bloco curto:
+   ```
+   [cofre] Possivelmente relevante para esta mensagem (abra só o que servir; só VERIFICADO é fato):
+   - F-C9XN2 [VERIFICADO] O cliente Acme autoriza testes de intrusão só em staging
+   - skill `pentest-web` — Metodologia de pentest em aplicações web (OWASP)... (carregue a skill se servir)
+   - nota Burp Suite: Proxy para pentest web... — cofre_ler "30-Conhecimento/Seguranca/Burp Suite.md"
+   ```
+5. A IA abre só o que servir (`cofre_ler` ou a skill). Mensagens sem relação ("oi", "ok", assunto que o vault não cobre) não geram bloco nenhum. No Hermes, itens já mostrados na sessão não se repetem.
 
 ### Descoberta durante o trabalho
 1. O agente lê `docker-compose.yml` e vê `image: postgres:16`.
@@ -106,4 +120,5 @@ flowchart TB
 | Skills no vault | Uma fonte só, versionada com git, visível no Obsidian, compartilhada por Hermes e OpenCode | Skills que o Hermes aprende também caem no vault (com aprovação); bundled do Hermes com o mesmo nome têm precedência |
 | Evidência de arquivo conferida | Detecta trecho inventado, o erro mais comum de modelo fraco | Evidência de comando/URL não é reexecutada (seria arriscado); fica a cargo da revisão humana e da política `humano` |
 | Desligar `MEMORY.md` do Hermes | Elimina a segunda fonte de verdade que contaminava as sessões | O agente perde o "diário pessoal" nativo; o cofre substitui com regras melhores (reversível) |
+| Relevância lexical (BM25 + radical + distância de edição) | Sem modelo de embeddings, roda em qualquer máquina, explicável, ~0,3 s com 2.000 notas | Não entende sinônimos que não aparecem no texto ("teste de intrusão" x "pentest" só casa se uma nota usar os dois). Mitigação: `tags` e `aliases` nas notas. Busca semântica com embeddings locais pode ser acrescentada depois sem mudar o resto |
 | Similaridade lexical para refutados/duplicatas | Sem dependências, previsível, explicável na mensagem de erro | Pode deixar passar paráfrases distantes ou acusar falsos positivos (agente pode usar `forcar` em casos não idênticos; você revisa) |

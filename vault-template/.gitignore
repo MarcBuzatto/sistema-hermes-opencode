@@ -4,3 +4,4 @@
 .cofre.lock
 .*.tmp
 90-Arquivo/Exportacoes-NotebookLM/
+.cofre/

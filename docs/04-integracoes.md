@@ -33,7 +33,7 @@ Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERME
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação), âncora com o foco atual a cada N turnos, aviso ao fechar sessão longa sem checkpoint |
+| `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação); a cada mensagem, bloco com o que o vault tem sobre o assunto (sem repetir itens já mostrados na sessão); âncora com o foco atual a cada N turnos; aviso ao fechar sessão longa sem checkpoint |
 | `mcp_servers.cofre` | Servidor MCP stdio | As 10 ferramentas `cofre_*` |
 | `plugins.enabled` | `+ cofre` | Plugins do usuário são opt-in |
 | `skills.create_dir` | `<vault>/60-Skills` | O Hermes lê as skills do vault e cria as que aprender lá. Se você já usa `create_dir` para outra pasta, o instalador mantém e adiciona o vault em `skills.external_dirs` |
@@ -52,7 +52,7 @@ Em `~/.config/opencode` (ou `OPENCODE_CONFIG_DIR`). `AGENTS.md` não é tocado.
 
 | Item | O que muda | Por quê |
 | --- | --- | --- |
-| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hooks `context` (contexto e regras no sistema a cada chamada, com cache de 30 s) e `compaction`; V1: `experimental.chat.system.transform` e `experimental.session.compacting`. Sem o plugin, só as instruções do MCP chegam ao modelo |
+| `plugins/cofre.js` | Plugin (pule com `--sem-plugin-opencode`) | V2: hook `context` (contexto e regras no sistema a cada chamada, com cache de 30 s, mais o bloco do que o vault tem sobre a última mensagem do usuário) e `compaction`; V1: `experimental.chat.system.transform`, `experimental.chat.messages.transform` (lê a última mensagem) e `experimental.session.compacting`. Sem o plugin, só as instruções do MCP chegam ao modelo |
 | `opencode.json` > MCP | Servidor `cofre` | V2: `mcp.servers.cofre` com `codemode: false` (ferramentas direto na lista nativa, melhor para modelos fracos). V1 ou versão desconhecida: `mcp.cofre`. Com `opencode.jsonc`, o instalador mostra o trecho para colar |
 | `opencode.json` > `skills` | `+ <vault>/60-Skills` (só V2) | A V2 lê skills de qualquer profundidade nessa pasta |
 | `skills/` | Cópias das skills do vault (só V1 ou versão desconhecida) | A V1 só enxerga `~/.config/opencode/skills/*/SKILL.md`. O plugin refaz a cópia a cada início; as cópias têm `.cofre-sync` e skills suas nessa pasta não são tocadas |

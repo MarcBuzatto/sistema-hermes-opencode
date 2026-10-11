@@ -15,6 +15,7 @@ O Cofre ataca as três com regras que rodam **em código**, não só no prompt:
 | Falha | Mecanismo |
 | --- | --- |
 | Esquecimento | Estado de trabalho por projeto + checkpoints; contexto reinjetado no prompt de sistema (Hermes) e a cada chamada (OpenCode), inclusive na compactação |
+| Não ler o que importa para o assunto | A cada mensagem sua, o plugin procura no vault inteiro o que tem a ver com o assunto (notas livres, fatos, decisões, fontes, skills) e mostra à IA poucas linhas apontando para isso; ela abre só o que servir. Falou de pentest, aparecem a skill de pentest, suas notas do Burp e o escopo autorizado pelo cliente, mesmo com "penteast" digitado errado |
 | Suposição virando fato | Todo fato nasce `hipotese`; `verificado` exige evidência, e evidência de arquivo é **conferida no disco** (trecho inventado é rejeitado) |
 | Persistir no erro | Fato refutado vira **armadilha** visível em toda sessão, com a versão correta ao lado; registrar de novo a afirmação refutada (ou paráfrase) é **bloqueado** |
 | Memória nativa contaminada | Instalador desliga o `MEMORY.md` do Hermes, liga aprovação para `USER.md`/skills e leva as entradas antigas para triagem |

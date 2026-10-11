@@ -18,6 +18,16 @@
 
 O Hermes avisa ao fechar uma sessão longa sem checkpoint.
 
+## A IA lendo o que importa para o assunto
+
+Você não precisa pedir: a cada mensagem, o plugin procura no vault o que tem a ver com o assunto e mostra à IA. Para ver o que ela receberia para uma frase:
+
+```bash
+cofre relevante "vamos fazer o pentest do cliente"
+```
+
+Se algo que deveria aparecer não aparece, melhore o título da nota ou acrescente `tags`/`aliases` com os termos que você usa (ver [03-estrutura-do-vault.md](03-estrutura-do-vault.md)). Para desligar, `relevancia_ativa: false` em `00-Sistema/config.md`.
+
 ## Skills
 
 As skills ficam em `60-Skills/` no vault e aparecem para Hermes e OpenCode como skills normais.
@@ -42,7 +52,8 @@ As skills ficam em `60-Skills/` no vault e aparecem para Hermes e OpenCode como 
 
 ```bash
 cofre contexto                                  # o que as IAs recebem nesta pasta
-cofre buscar "postgres"                         # busca com status
+cofre buscar "postgres"                         # busca no vault inteiro, com status
+cofre relevante "texto da mensagem"             # o que a IA recebe sobre esse assunto
 cofre ler F-1D69S                               # nota completa
 cofre fato "O deploy é na Vercel" --status verificado --evidencia "usuario :: conversa :: o deploy é na vercel" --humano
 cofre refutar F-T05W0 --motivo "auth é por sessão" --correto "A API autentica com sessão em cookie httpOnly" --humano

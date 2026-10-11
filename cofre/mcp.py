@@ -26,7 +26,8 @@ INSTRUCOES = (
     "(3) Nunca trate HIPÓTESE como fato nem repita afirmações REFUTADAS (Armadilhas). "
     "(4) Descobertas: cofre_registrar_fato (verificado só com evidência copiada exatamente, caminho absoluto). "
     "(5) Correções do usuário ou conflitos com o código: cofre_atualizar_fato. (6) Decisões: cofre_decisao. "
-    "(7) cofre_checkpoint ao fim de cada etapa. (8) Nunca grave segredos. Procedimento completo: skill cofre-protocolo."
+    "(7) cofre_checkpoint ao fim de cada etapa. (8) Assunto novo na conversa: cofre_buscar pelo tema (o vault tem notas, "
+    "fontes e skills) e abra só o que servir com cofre_ler. (9) Nunca grave segredos. Procedimento completo: skill cofre-protocolo."
 )
 
 

@@ -4,6 +4,8 @@ Este vault é a memória de longo prazo das IAs que trabalham no seu PC (Hermes 
 
 Nada disso depende do seu `AGENTS.md` ou do `SOUL.md`: o protocolo chega aos modelos pelos plugins do Hermes e do OpenCode (prompt de sistema), pelas instruções do servidor MCP e pela skill `cofre-protocolo`.
 
+A cada mensagem sua, os plugins procuram aqui o que tem a ver com o assunto da conversa (notas livres, fatos, decisões, fontes, skills) e mostram para a IA, que abre só o que servir. Títulos claros e `tags`/`aliases` ajudam a nota a ser achada.
+
 ## A ideia central
 Modelos (principalmente os mais fracos) esquecem, resumem errado e, pior, guardam suposições como se fossem verdade e passam a defender o erro. O cofre resolve isso separando **o que foi comprovado** do **que foi suposto**:
 

@@ -34,8 +34,8 @@ REGRAS = [
     "Usuário corrigiu ou o código contradiz o cofre? cofre_atualizar_fato (refutar/contestar). Corrigir só na conversa não basta.",
     "Decisão de projeto: cofre_decisao (fica 'aceita' só com as palavras do usuário).",
     "Fim de etapa, conversa longa ou antes de encerrar: cofre_checkpoint.",
-    "Antes de afirmar algo do projeto que não está aqui: cofre_buscar. Nunca grave senhas, tokens ou chaves.",
-    "Procedimento completo: skill cofre-protocolo.",
+    "Bloco '[cofre] Possivelmente relevante' = o vault tem algo ligado à mensagem: abra (cofre_ler ou skill) só o que servir. Sem ele, cofre_buscar antes de afirmar o que não está aqui.",
+    "Nunca grave senhas, tokens ou chaves. Procedimento completo: skill cofre-protocolo.",
 ]
 
 
@@ -237,43 +237,40 @@ def ancora(cofre: Cofre, proj: Nota | None) -> str:
 # ---- consultas ------------------------------------------------------------
 def buscar(cofre: Cofre, consulta: str, projeto: str | None = None, tipo: str | None = None,
            status=None, limite: int = 10, cwd: str | None = None) -> str:
-    termos = ep.tokens(consulta)
-    if not termos:
-        return "Consulta vazia."
+    from . import relevancia
+
     proj = cofre.projeto(projeto) if projeto else None
-    status_ok = {s.strip().lower() for s in lista(status)} if status else None
-    resultados = []
-    baixo = " ".join(str(consulta).lower().split())
-    for n in cofre.notas():
-        if tipo and tipo != "qualquer" and n.tipo != tipo:
-            continue
-        if n.tipo in ("config",):
-            continue
-        if status_ok and n.status not in status_ok:
-            continue
-        if proj and n.projeto not in (proj.nome, None) and n.nome != proj.nome:
-            continue
-        titulo = str(n.meta.get("afirmacao") or n.meta.get("titulo") or n.nome)
-        alvo_tokens = ep.tokens(titulo + " " + n.corpo[:4000] + " " + " ".join(map(str, lista(n.meta.get("tags")))))
-        comuns = termos & alvo_tokens
-        if not comuns:
-            continue
-        pontos = len(comuns) / len(termos) + (0.5 if baixo in titulo.lower() else 0) + (0.3 if termos <= ep.tokens(titulo) else 0)
-        resultados.append((pontos, n, titulo))
-    if not resultados:
+    tipos = None
+    if tipo and tipo != "qualquer":
+        tipos = ["skill", "skill-ref"] if tipo == "skill" else [tipo]
+    status_ok = [s.strip().lower() for s in lista(status)] if status else None
+    achados = relevancia.buscar(cofre, consulta, projeto=proj.nome if proj else None, limite=max(1, int(limite)) * 3,
+                                tipos=tipos, status=status_ok, so_fortes=False)
+    if proj:
+        achados = [a for a in achados if a.doc.get("projeto") in (proj.nome, None)]
+    achados = achados[: max(1, int(limite))]
+    if not achados:
         return f"Nada encontrado para '{consulta}'. Lembre: ausência no cofre não prova que algo é falso."
-    resultados.sort(key=lambda x: x[0], reverse=True)
-    linhas = [f"Resultados para '{consulta}':"]
-    for _, n, titulo in resultados[: max(1, int(limite))]:
-        escopo = f" · projeto {n.projeto}" if n.projeto else (" · global" if n.tipo == "fato" else "")
-        ident = n.id or n.nome
-        st = f"[{rotulo(n)}] " if n.status else ""
-        linhas.append(f"- {ident} {n.tipo} {st}{_curto(titulo, 140)}{escopo} — {cofre.relativo(n.caminho)}")
-    return "\n".join(linhas)
+    return f"Resultados para '{consulta}':\n" + "\n".join(
+        f"{relevancia.linha(a)} ({a.rel})" for a in achados)
+
+
+def _por_caminho(cofre: Cofre, ref: str) -> Nota | None:
+    from .vault import ler_nota
+
+    rel = str(ref).strip().strip('"').replace("\\", "/")
+    if not rel.endswith(".md"):
+        rel += ".md"
+    alvo = (cofre.raiz / rel).resolve()
+    try:
+        alvo.relative_to(cofre.raiz.resolve())
+    except ValueError:
+        return None
+    return ler_nota(alvo) if alvo.is_file() else None
 
 
 def ler(cofre: Cofre, ref: str) -> str:
-    nota = cofre.resolver_ref(ref) or cofre.projeto(ref)
+    nota = cofre.resolver_ref(ref) or cofre.projeto(ref) or _por_caminho(cofre, ref)
     if not nota:
         return f"Nota '{ref}' não encontrada. Use cofre_buscar."
     aviso = ""
@@ -287,5 +284,9 @@ def ler(cofre: Cofre, ref: str) -> str:
         }.get(nota.status, "")
     elif nota.tipo in ("sessao", "estado", "captura"):
         aviso = "Escrito por agente / bruto: não é fonte de verdade."
-    cabeca = f"[{nota.tipo.upper()}" + (f" · {rotulo(nota)}" if nota.status else "") + f"] {aviso}".rstrip()
+    elif nota.tipo == "fonte":
+        aviso = "Material externo: não é fato até ser conferido."
+    elif not nota.tipo:
+        aviso = "Nota livre do usuário: trate o conteúdo como referência, não como fato verificado."
+    cabeca = f"[{(nota.tipo or 'nota').upper()}" + (f" · {rotulo(nota)}" if nota.status else "") + f"] {aviso}".rstrip()
     return f"{cabeca}\nArquivo: {cofre.relativo(nota.caminho)}\n\n{nota.texto()}"

@@ -58,6 +58,20 @@ def cmd_buscar(a):
     _imprimir(contexto.buscar(_cofre(a), a.consulta, projeto=a.projeto, tipo=a.tipo, status=a.status, limite=a.limite))
 
 
+def cmd_relevante(a):
+    from . import relevancia
+
+    cofre = _cofre(a)
+    texto = sys.stdin.read() if a.stdin or not a.texto else " ".join(a.texto)
+    proj = contexto.resolver_projeto(cofre, a.cwd) if a.cwd else None
+    bloco, usados = relevancia.relevante(cofre, texto, projeto=proj.nome if proj else None,
+                                         excluir=[x for x in (a.excluir or "").split(",") if x])
+    if a.json:
+        _imprimir(json.dumps({"bloco": bloco, "ids": usados}, ensure_ascii=False))
+    elif bloco:
+        _imprimir(bloco)
+
+
 def cmd_ler(a):
     _imprimir(contexto.ler(_cofre(a), a.id))
 
@@ -327,7 +341,14 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("--status", nargs="*")
     sp.add_argument("--limite", type=int, default=10)
 
-    sp = novo("ler", cmd_ler, "Lê uma nota pelo ID")
+    sp = novo("relevante", cmd_relevante, "Mostra o que o vault tem de relacionado a um texto (usado pelos plugins)")
+    sp.add_argument("texto", nargs="*")
+    sp.add_argument("--stdin", action="store_true", help="Lê o texto da entrada padrão")
+    sp.add_argument("--cwd")
+    sp.add_argument("--excluir", help="IDs/caminhos já mostrados, separados por vírgula")
+    sp.add_argument("--json", action="store_true")
+
+    sp = novo("ler", cmd_ler, "Lê uma nota pelo ID ou caminho relativo ao vault")
     sp.add_argument("id")
 
     sp = novo("fato", cmd_fato, "Registra um fato", autor=True)

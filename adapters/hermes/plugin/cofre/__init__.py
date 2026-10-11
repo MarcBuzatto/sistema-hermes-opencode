@@ -2,8 +2,10 @@
 
 - Seção de prompt de sistema (estável, sobrevive à compactação): contexto do projeto
   detectado pelo diretório da sessão.
-- pre_llm_call: a cada N turnos reinjeta uma âncora curta com o foco atual (lido do disco,
-  então reflete checkpoints feitos no meio da sessão).
+- pre_llm_call (toda mensagem): procura no vault o que tem a ver com o que o usuário acabou
+  de escrever (notas, fatos, decisões, fontes, skills) e anexa poucas linhas apontando para
+  isso, sem repetir o que já foi mostrado na sessão. A cada N turnos também reinjeta uma
+  âncora curta com o foco atual (lido do disco).
 - post_tool_call + on_session_finalize: avisa ao fechar uma sessão longa sem checkpoint.
 
 Gerado pelo instalador do cofre; COFRE_APP aponta para a instalação do pacote.
@@ -23,6 +25,7 @@ LINHA_HERMES = (
 _turnos = {}
 _checkpoints = set()
 _cwd_sessao = {}
+_vistos = {}
 
 
 def _garantir_path():
@@ -49,6 +52,30 @@ def _texto(cwd, modo):
         return ""
 
 
+def _texto_mensagem(mensagem):
+    if isinstance(mensagem, str):
+        return mensagem
+    if isinstance(mensagem, list):
+        return "\n".join(p.get("text", "") for p in mensagem if isinstance(p, dict) and p.get("type") == "text")
+    return ""
+
+
+def _relevante(session_id, texto):
+    try:
+        _garantir_path()
+        from cofre import contexto, relevancia
+
+        cofre = _cofre()
+        proj = contexto.resolver_projeto(cofre, _cwd_sessao.get(session_id) or os.getcwd())
+        vistos = _vistos.setdefault(session_id, set())
+        bloco, ids = relevancia.relevante(cofre, texto, projeto=proj.nome if proj else None, excluir=vistos)
+        vistos.update(ids)
+        return bloco
+    except Exception as e:
+        log.warning("cofre: relevância indisponível: %s", e)
+        return ""
+
+
 def _config(chave, padrao):
     try:
         return int(_cofre().config().get(chave, padrao))
@@ -68,16 +95,21 @@ def register(ctx):
 
     ctx.register_system_prompt_section("cofre.contexto", secao, position="after_memory", max_chars=4000)
 
-    def ancora(session_id=None, is_first_turn=False, **kwargs):
+    def por_mensagem(session_id=None, user_message="", is_first_turn=False, **kwargs):
         n = _turnos.get(session_id, 0) + 1
         _turnos[session_id] = n
+        partes = []
+        bloco = _relevante(session_id, _texto_mensagem(user_message))
+        if bloco:
+            partes.append(bloco)
         intervalo = _config("ancora_a_cada_turnos", 5)
-        if is_first_turn or intervalo <= 0 or n % intervalo:
-            return None
-        texto = _texto(_cwd_sessao.get(session_id) or os.getcwd(), "ancora")
-        return {"context": texto} if texto else None
+        if not is_first_turn and intervalo > 0 and n % intervalo == 0:
+            texto = _texto(_cwd_sessao.get(session_id) or os.getcwd(), "ancora")
+            if texto:
+                partes.append(texto)
+        return {"context": "\n\n".join(partes)} if partes else None
 
-    ctx.register_hook("pre_llm_call", ancora)
+    ctx.register_hook("pre_llm_call", por_mensagem)
 
     def marcar_checkpoint(tool_name="", task_id="", **kwargs):
         if "cofre_checkpoint" in str(tool_name):
@@ -88,6 +120,7 @@ def register(ctx):
     def ao_finalizar(session_id=None, **kwargs):
         turnos = _turnos.pop(session_id, 0)
         _cwd_sessao.pop(session_id, None)
+        _vistos.pop(session_id, None)
         teve = session_id in _checkpoints or "" in _checkpoints
         _checkpoints.discard(session_id)
         if turnos >= _config("lembrar_checkpoint_apos_turnos", 4) and not teve:
