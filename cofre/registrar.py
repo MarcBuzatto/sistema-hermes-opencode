@@ -22,7 +22,7 @@ from . import gitlog
 from .config import ErroCofre
 from .projetos import bases_de_arquivos, normalizar_repo, resolver_projeto
 from .vault import (
-    PASTAS, Cofre, Nota, agora, alvo_link, daqui, hoje, juntar_secoes, ler_nota, link, lista,
+    PASTAS, Cofre, Nota, agora, agora_texto, alvo_link, daqui, hoje, juntar_secoes, ler_nota, link, lista,
     secao, secoes, slug,
 )
 
@@ -105,7 +105,7 @@ def _normal_status(status: str | None, padrao: str) -> str:
 
 
 def _linha_hist(texto: str, autor: Autor) -> str:
-    return f"- {agora()} — {texto} (por {autor.assinatura})"
+    return f"- {agora_texto()} — {texto} (por {autor.assinatura})"
 
 
 def _validar_evidencias(cofre: Cofre, evs: list[ep.Evidencia], bases: list[str], autor: Autor) -> list[str]:
@@ -553,7 +553,7 @@ def _sessao_aberta(cofre: Cofre, slug_p: str | None, autor: Autor) -> Nota | Non
         if n.projeto != slug_p or n.meta.get("agente") != autor.assinatura:
             continue
         try:
-            quando = datetime.strptime(str(n.meta.get("atualizada", ""))[:16], "%Y-%m-%d %H:%M")
+            quando = datetime.strptime(str(n.meta.get("atualizada", "")).replace("T", " ")[:16], "%Y-%m-%d %H:%M")
         except ValueError:
             continue
         if quando >= limite:
@@ -585,7 +585,7 @@ def checkpoint(
             sessao = _sessao_aberta(cofre, slug_p, autor)
         if sessao_id and not sessao:
             avisos.append(f"Sessão '{sessao_id}' não encontrada; criei uma nova.")
-        bloco = [f"### {agora()[11:]}", resumo]
+        bloco = [f"### {agora_texto()[11:]}", resumo]
         if feito:
             bloco += ["", "**Feito**"] + [f"- {i}" for i in feito]
         if proximos:
@@ -643,7 +643,7 @@ def checkpoint(
                 ("Foco atual", foco_txt),
                 ("Próximos passos", prox_txt or "- (nenhum registrado)"),
                 ("Bloqueios", bloq_txt or "- (nenhum)"),
-                ("Último checkpoint", f"{resumo}\n\n({agora()}, {autor.assinatura}, {link(sessao.caminho.stem)})"),
+                ("Último checkpoint", f"{resumo}\n\n({agora_texto()}, {autor.assinatura}, {link(sessao.caminho.stem)})"),
             ])
             arq_estado = cofre.arquivo_estado(slug_p)
             cofre.salvar(Nota(arq_estado, meta_e, corpo_e))

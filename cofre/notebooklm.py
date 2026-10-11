@@ -18,7 +18,7 @@ from .config import ErroCofre
 from .contexto import rotulo
 from .registrar import Autor, Resultado, _commit, _limpar
 from .vault import (
-    DIR_EXPORTACOES, PASTAS, Cofre, Nota, agora, escrever_atomico, hoje, link, lista, secao, slug,
+    DIR_EXPORTACOES, PASTAS, Cofre, Nota, agora_texto, escrever_atomico, hoje, link, lista, secao, slug,
 )
 
 LEGENDA = """> Legenda de confiabilidade (gerado pelo Cofre em {quando}):
@@ -32,7 +32,7 @@ LIMITE_PALAVRAS = 400_000
 
 
 def _arquivo(destino: Path, titulo: str, corpo: str) -> Path:
-    texto = f"# {titulo}\n\n{LEGENDA.format(quando=agora())}\n{corpo.strip()}\n"
+    texto = f"# {titulo}\n\n{LEGENDA.format(quando=agora_texto())}\n{corpo.strip()}\n"
     if len(texto.split()) > LIMITE_PALAVRAS:
         raise ErroCofre(f"{destino.name} passou de {LIMITE_PALAVRAS} palavras; exporte por período ou divida o projeto.")
     escrever_atomico(destino, texto)

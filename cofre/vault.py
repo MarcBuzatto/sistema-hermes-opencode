@@ -38,7 +38,7 @@ STATUS_MISSAO = ("ativa", "pausada", "concluida", "cancelada")
 STATUS_SPEC = ("rascunho", "aprovada", "em_execucao", "concluida", "cancelada")
 TIPOS = (
     "fato", "decisao", "sessao", "estado", "projeto", "missao",
-    "captura", "cliente", "fonte", "perfil", "config", "spec", "instrucao", "recurso",
+    "captura", "cliente", "fonte", "perfil", "config", "spec", "instrucao", "recurso", "moc",
 )
 PREFIXOS = {"fato": "F", "decisao": "D", "sessao": "S", "missao": "M", "captura": "C", "fonte": "N", "spec": "E"}
 _ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -50,6 +50,13 @@ def hoje() -> str:
 
 
 def agora() -> str:
+    """Valor de propriedade: formato "Date & time" do Obsidian (2020-08-21T10:30:00), para o Bases
+    e o painel de propriedades tratarem como data, não como texto."""
+    return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def agora_texto() -> str:
+    """Para texto corrido (histórico, cabeçalhos): mais fácil de ler."""
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 

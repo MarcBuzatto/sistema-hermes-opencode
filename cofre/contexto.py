@@ -13,7 +13,7 @@ from datetime import date
 from . import epistemica as ep
 from . import specs
 from .projetos import resolver_projeto
-from .vault import Cofre, Nota, agora, alvo_link, lista, para_data, secao
+from .vault import Cofre, Nota, agora_texto, alvo_link, lista, para_data, secao
 
 ROTULOS = {
     "verificado": "VERIFICADO",
@@ -170,7 +170,7 @@ def montar(cofre: Cofre, cwd: str | None = None, projeto: str | None = None, max
     if proj:
         nome = proj.meta.get("nome") or slug_p
         cab = [f"# COFRE · contexto do projeto: {nome} ({slug_p})",
-               ("" if sistema else f"Gerado {agora()} · ") + f"vault: {cofre.raiz} · pasta: {cofre.relativo(cofre.pasta_projeto(slug_p))}"]
+               ("" if sistema else f"Gerado {agora_texto()} · ") + f"vault: {cofre.raiz} · pasta: {cofre.relativo(cofre.pasta_projeto(slug_p))}"]
         estado = cofre.estado(slug_p)
         if estado:
             itens = [f"Foco: {_curto(secao(estado.corpo, 'Foco atual'), 300)}"]
@@ -187,7 +187,7 @@ def montar(cofre: Cofre, cwd: str | None = None, projeto: str | None = None, max
             secoes.insert(0, _Secao("AGORA", [agora_spec], prioridade=0, minimo=1))
     else:
         cab = ["# COFRE · contexto geral (nenhum projeto associado a este diretório)",
-               ("" if sistema else f"Gerado {agora()} · ") + f"vault: {cofre.raiz}"]
+               ("" if sistema else f"Gerado {agora_texto()} · ") + f"vault: {cofre.raiz}"]
         if cwd:
             cab.append(f"Diretório: {cwd}. Se for um projeto, vincule com cofre_projeto(acao='vincular') ou crie um (se o usuário pedir).")
         projetos = sorted(cofre.projetos().values(), key=lambda n: n.nome)

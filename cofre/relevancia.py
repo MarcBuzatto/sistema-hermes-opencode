@@ -33,7 +33,7 @@ from pathlib import Path
 from . import frontmatter
 from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista
 
-VERSAO_INDICE = 6
+VERSAO_INDICE = 7
 RADICAL = 6
 PESO_APROXIMADO = 0.8
 ARQUIVO_INDICE = Path(".cofre") / "indice.json"
@@ -142,6 +142,7 @@ def _primeira_linha(corpo: str) -> str:
     return ""
 
 
+_LINK_INTERNO = re.compile(r"\[\[[^\]]+\]\]")
 _DATA_HORA = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?\b")
 
 
@@ -186,7 +187,10 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
     titulo = str(meta.get("afirmacao") or meta.get("titulo") or meta.get("nome") or meta.get("name")
                  or titulo_h1 or caminho.stem)
     extras = [str(x) for x in lista(meta.get("tags")) + lista(meta.get("aliases"))]
-    extras += [str(meta.get(k)) for k in ("description", "id", "motivo", "quando_usar") if meta.get(k)]
+    extras += [str(meta.get(k)) for k in ("description", "resumo", "summary", "id", "motivo", "quando_usar")
+               if meta.get(k)]
+    if tipo == "nota" and "moc" in {str(t).lower().lstrip("#") for t in lista(meta.get("tags"))}:
+        tipo = "moc"
     url = str(meta.get("url") or meta.get("link") or "")
     if url:
         extras.append(url)
@@ -213,7 +217,9 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
         "origem": str(meta.get("origem") or meta.get("confiabilidade") or ""),
         "skill": skill,
         "url": url,
-        "resumo": " ".join(str(meta.get("quando_usar") or meta.get("description") or "").split())[:220] or _primeira_linha(corpo),
+        "resumo": " ".join(str(meta.get("quando_usar") or meta.get("description") or meta.get("resumo")
+                               or meta.get("summary") or "").split())[:220] or _primeira_linha(corpo),
+        "links": len(_LINK_INTERNO.findall(corpo)) if tipo == "moc" else 0,
         "tf": dict(tf),
         "tx": sorted(tx),
         "w": sorted(inteiras),
@@ -281,7 +287,7 @@ class Achado:
 
 def _peso(doc: dict, projeto: str | None) -> float:
     tipo, status = doc.get("tipo"), doc.get("status")
-    peso = {"skill": 1.3, "instrucao": 1.3, "recurso": 1.2, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1,
+    peso = {"moc": 1.5, "skill": 1.3, "instrucao": 1.3, "recurso": 1.2, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1,
             "fonte": 1.0, "nota": 1.0, "missao": 0.9, "cliente": 1.0, "projeto": 0.9, "sessao": 0.6,
             "captura": 0.5}.get(tipo, 0.9)
     if tipo == "fato":
@@ -301,7 +307,7 @@ def _termos_do_projeto(cofre: Cofre, projeto: str | None) -> set[str]:
     return {t for n in nomes for t in termos(n)}
 
 
-def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5, excluir=(),
+def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5, excluir=(), incluir_arquivo=True,
            tipos=None, status=None, so_fortes: bool = True) -> list[Achado]:
     originais = list(dict.fromkeys(palavras(str(texto)[:4000])))
     do_projeto = _termos_do_projeto(cofre, projeto)
@@ -310,6 +316,8 @@ def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5
     if not originais:
         return []
     docs = carregar_indice(cofre.raiz)
+    if not incluir_arquivo:
+        docs = {k: d for k, d in docs.items() if not k.startswith(PASTAS["arquivo"] + "/")}
     if tipos:
         docs = {k: d for k, d in docs.items() if d.get("tipo") in set(tipos)}
     if status:
@@ -406,6 +414,9 @@ def linha(a: Achado) -> str:
         return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir)"
     if tipo == "instrucao":
         return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: cofre_ler \"{a.rel}\""
+    if tipo == "moc":
+        qtd = f" ({d['links']} notas)" if d.get("links") else ""
+        return f"- mapa do assunto: {_curto(d['titulo'], 80)}{qtd} — abra primeiro, ele aponta o resto: cofre_ler \"{a.rel}\""
     if tipo == "recurso":
         onde = f" [abra: {d['url']}]" if d.get("url") else ""
         quando = f" — {_curto(d['resumo'], 110)}" if d.get("resumo") and d["resumo"] != d["titulo"] else ""
@@ -444,7 +455,9 @@ def relevante(cofre: Cofre, texto: str, projeto: str | None = None, excluir=()) 
     cfg = cofre.config()
     if not cfg.get("relevancia_ativa", True) or len(str(texto).strip()) < 3:
         return "", []
-    achados = buscar(cofre, texto, projeto=projeto, limite=int(cfg.get("relevancia_max_itens", 5)), excluir=excluir)
+    # Arquivo morto (90-Arquivo) fica fora da busca automática; cofre_buscar ainda acha.
+    achados = buscar(cofre, texto, projeto=projeto, limite=int(cfg.get("relevancia_max_itens", 5)), excluir=excluir,
+                     incluir_arquivo=False)
     texto_bloco = bloco(achados, int(cfg.get("relevancia_max_chars", 1600)))
     usados = [a.chave for a in achados if linha(a) in texto_bloco]
     return texto_bloco, usados

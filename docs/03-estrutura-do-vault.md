@@ -67,7 +67,7 @@ Site, API ou ferramenta externa que a IA deve abrir/usar quando o assunto aparec
 Seção do seu AGENTS.md levada para o vault por `cofre agents-md dividir`: `titulo`, `origem`, `tags`, `aliases`. Aparece para a IA como "instrução sua" quando o assunto surge.
 
 ### Outras
-`captura` (inbox, `status: pendente`), `fonte` (`origem`, `confiabilidade`), `perfil`, `config`. Notas sem `tipo` (como os `LEIA-ME`) são ignoradas pelo motor.
+`moc` (mapa do assunto: lista de links para as notas de um tema), `captura` (inbox, `status: pendente`), `fonte` (`origem`, `confiabilidade`), `perfil`, `config`. Notas sem `tipo` (como os `LEIA-ME`) são ignoradas pelo motor.
 
 ## Skills (`60-Skills/`)
 
@@ -82,6 +82,18 @@ Cada skill é uma pasta com `SKILL.md` (frontmatter `name`, igual ao nome da pas
 Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincronizar`. O painel `Skills.base` lista todas.
 
 ## Notas livres e busca por relevância
+
+### Como escrever notas que a IA acha (resumo da sua pesquisa, respostas 1 a 4)
+
+- **Título**: uma frase que diz a ideia ("Tailwind liga o tema escuro pela classe dark"), sem ID no nome. Atalhos e siglas vão em `aliases`, que a busca também usa.
+- **`description`**: uma linha dizendo do que a nota trata. É ela que a IA recebe como resumo do ponteiro, em vez da primeira linha do texto. `description` é uma propriedade que o próprio Obsidian reconhece; `resumo` também funciona.
+- **Tags**: de 2 a 5, planas (`#pentest`, `#frontend`). Use aninhadas só para estado (`#status/rascunho`). Mais de 5 tags indica que a nota trata de várias coisas e vale dividir.
+- **MOC (mapa do assunto)**: com 3 ou mais notas sobre um tema, crie um MOC pelo modelo `MOC` (ou ponha a tag `moc`). Quando o assunto aparece, a IA recebe primeiro o mapa e abre só o que servir, o que gasta menos tokens que vários ponteiros soltos.
+- **Propriedades**: nomes minúsculos sem espaço (`quando_usar`), sempre do mesmo tipo em todo o vault, sem YAML aninhado e com links entre aspas (`projeto: "[[loja]]"`).
+- **Arquivo morto**: o que está em `90-Arquivo/` não entra na busca automática por mensagem, mas `cofre_buscar` ainda encontra.
+- **Renomear e mover**: faça no Obsidian, que atualiza os links. Pelo terminal (`mv`) os links quebram.
+
+As notas que o cofre cria (fatos, decisões, specs) continuam com o ID no nome (`F-7K3PQ ...`). Os agentes citam esses IDs, e eles garantem nome único quando um fato refutado e a correção dele têm textos parecidos. Você vê essas notas pelos painéis, que mostram a afirmação e não o nome do arquivo.
 
 Qualquer nota Markdown fora de `00-Sistema/` entra na busca, mesmo sem `tipo` nem frontmatter: suas anotações em `30-Conhecimento`, `40-Clientes`, `50-Fontes` etc. A cada mensagem, os plugins procuram ali o que tem a ver com o assunto e apontam para a IA (detalhes em [01-arquitetura.md](01-arquitetura.md)). Para uma nota ser achada:
 

@@ -57,6 +57,8 @@ A mensagem diz exatamente o que corrigir (trecho que não confere, afirmação j
 - Escreva no vault apenas pelas ferramentas `cofre_*` (exceção: skills em `60-Skills/`, criadas pelo mecanismo de skills do seu harness). Ler arquivos do vault diretamente é permitido.
 - Crie ou vincule projetos (`cofre_projeto`) só quando o usuário pedir ou confirmar.
 - Ausência no cofre não prova que algo é falso: verifique no código ou pergunte.
+- Nunca mova, renomeie ou apague notas do vault pelo terminal (`mv`, `rm`): isso quebra os `[[links]]` das outras notas. Renomear e mover é com o usuário, no Obsidian.
+- Linha "mapa do assunto: ..." no bloco de relevância = índice (MOC) do tema: abra ele primeiro e siga só os links que servirem.
 
 ## 8. Skills
 As skills do usuário ficam no vault em `60-Skills/` e aparecem para você como skills normais. Antes de seguir uma skill com status `rascunho` ou sem fonte, avise o usuário; ela pode conter informação não verificada.
