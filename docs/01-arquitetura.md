@@ -81,7 +81,7 @@ flowchart TB
 ### Cada mensagem: o que o vault tem sobre o assunto
 1. Você escreve, por exemplo, "vamos fazer o penteast do cliente".
 2. O plugin (Hermes: `pre_llm_call`; OpenCode: hook `context`) manda o texto da mensagem para `cofre relevante`.
-3. O motor busca no vault inteiro (notas livres, fatos, decisões, fontes do NotebookLM, skills e referências de skills), com ranqueamento BM25 e tolerância a erro de digitação, usando um índice em cache (`.cofre/indice.json`, atualizado só para arquivos alterados).
+3. O motor busca no vault inteiro (notas livres, fatos, decisões, fontes do NotebookLM, skills e referências de skills), com ranqueamento BM25 e tolerância a erro de digitação, usando um índice em cache fora do vault (`~/.cache/cofre/` no Linux/macOS, `%LOCALAPPDATA%\cofre\cache` no Windows; atualizado só para arquivos alterados). Fora do vault ele não vai para sync nem git, não aparece no `grep -r` dos agentes, e Windows e WSL usando o mesmo vault não reescrevem o mesmo arquivo.
 4. Se houver algo forte o bastante, a IA recebe um bloco curto:
    ```
    [cofre] Possivelmente relevante para esta mensagem (abra só o que servir; só VERIFICADO é fato):

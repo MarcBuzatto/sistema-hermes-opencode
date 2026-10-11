@@ -47,8 +47,13 @@ class TestRelevancia(CofreTeste):
 
     def test_indice_em_cache_atualiza_arquivo_alterado(self):
         self.popular()
+        antigo = self.vault / ".cofre" / "indice.json"
+        antigo.parent.mkdir(parents=True, exist_ok=True)
+        antigo.write_text("{}", encoding="utf-8")
         relevancia.carregar_indice(self.vault)
-        self.assertTrue((self.vault / ".cofre" / "indice.json").exists())
+        self.assertTrue(relevancia.arquivo_indice(self.vault).exists())
+        self.assertFalse(relevancia.arquivo_indice(self.vault).is_relative_to(self.vault), "índice fora do vault")
+        self.assertFalse(antigo.exists(), "índice antigo dentro do vault é apagado")
         nota = self.nota("30-Conhecimento/Frontend/Tailwind.md", "# Tailwind CSS\nAgora fala de kubernetes e helm.\n")
         futuro = time.time() + 5
         os.utime(nota, (futuro, futuro))

@@ -327,12 +327,10 @@ def _completar_gitignore(alvo: Path, modelo: Path) -> int:
 
 
 def cmd_privado(a):
-    cofre = _cofre(a)
-    # Caminho como configurado e resolvido: symlink, /var -> /private/var no macOS, nome curto 8.3 no Windows.
-    raizes = list(dict.fromkeys([str(vault_configurado(a.vault)), str(cofre.raiz.resolve())]))
-    pastas = list(dict.fromkeys(os.path.join(r, *p.split("/")) for r in raizes for p in cofre.pastas_privadas()))
-    _imprimir(json.dumps({"vaults": raizes, "absolutas": pastas, "relativas": cofre.pastas_privadas()},
-                         ensure_ascii=False) if a.json else "\n".join(pastas))
+    from . import privado
+
+    dados = privado.caminhos(_cofre(a), vault_configurado(a.vault))
+    _imprimir(json.dumps(dados, ensure_ascii=False) if a.json else "\n".join(dados["absolutas"]))
 
 
 def cmd_hook_hermes(a):

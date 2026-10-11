@@ -15,7 +15,7 @@ Situação: recebidas todas (contexto e 1 a 13) e analisadas.
 | 8 e 9 | Inbox.base com "Tudo na inbox"; revisão aponta notas sem nenhum link, temas com 3+ notas sem MOC e itens parados na inbox; rotina semanal/mensal na doc | Templater e QuickAdd: opcionais, nada no cofre depende deles |
 | 10 | Fluxo fonte -> hipótese -> verificado -> skill com `status` e `fontes`, blocos `[!check]`/`[!quote]`; skill em rascunho marcada na relevância; `cofre skills verificar` cobra `fontes` | Pastas `20-Literature/` e `30-Permanent/`: o cofre já separa por `tipo` (fonte vs. fato verificado) |
 | 11 | Procedimentos para as IAs continuam como skills em `60-Skills/` (com `status`, `fontes` e git) | `.claude/agents` e `CLAUDE.md`: Claude Code. Agentes guardados no vault e sincronizados para OpenCode/Hermes: proposto como próximo passo |
-| 13 | `99-Privado/` e `pastas_privadas`: fora do índice, da busca, da relevância e do `cofre_ler`; no `.gitignore`; revisão acusa pasta privada versionada; plugin do OpenCode bloqueia ferramentas que apontem para ela; doc de sync e backup | Deny rules em `.claude/settings.local.json`: Claude Code. No Hermes o plugin não tem como bloquear ferramenta de arquivo; documentado como limite |
+| 13 | `99-Privado/` e `pastas_privadas`: fora do índice, da busca, da relevância e do `cofre_ler`; no `.gitignore`; revisão acusa pasta privada versionada; plugins do Hermes e do OpenCode bloqueiam ferramentas que apontem para ela e filtram as respostas; regras nativas `deny` no OpenCode V2; doc de sync e backup | Deny rules em `.claude/settings.local.json`: são do Claude Code (o equivalente aqui são as regras nativas do OpenCode V2 e o `pre_tool_call` do Hermes) |
 
 ---
 

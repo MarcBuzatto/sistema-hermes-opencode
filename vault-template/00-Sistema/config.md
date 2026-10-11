@@ -42,4 +42,4 @@ Edite as propriedades acima pelo painel de propriedades do Obsidian. Elas valem 
 | `verificacao_timeout` | Specs: tempo máximo (segundos) de cada comando de verificação que o cofre roda ao concluir uma tarefa. |
 | `verificacao_comandos` | Specs: comandos extras que o cofre pode rodar como verificação, além dos de teste/lint/build conhecidos (npm test, pytest, go test, cargo test...). Prefixo exato, ex.: `docker compose run --rm api pytest`. O cofre nunca usa shell. |
 | `ler_max_chars` | Nota maior que isso: `cofre_ler` devolve o começo e a lista de seções, e a IA pede só a seção que precisa (economiza tokens). Ponha títulos `##` nas notas longas. |
-| `pastas_privadas` | Pastas (relativas ao vault) que as IAs não leem pelo cofre, além de `99-Privado`. Ex.: `40-Clientes/Confidencial`. Acrescente também ao `.gitignore` do vault. |
+| `pastas_privadas` | Pastas (relativas ao vault) que as IAs não leem, além de `99-Privado`. Ex.: `40-Clientes/Confidencial`. Acrescente também ao `.gitignore` do vault. Os plugins pegam a mudança em até 30 s; no OpenCode V2, rode o instalador de novo para atualizar as regras nativas. |

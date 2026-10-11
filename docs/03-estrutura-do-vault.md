@@ -94,7 +94,7 @@ Comandos: `cofre skills listar`, `cofre skills verificar`, `cofre skills sincron
 - **Propriedades**: nomes minúsculos sem espaço (`quando_usar`), sempre do mesmo tipo em todo o vault, sem YAML aninhado e com links entre aspas (`projeto: "[[loja]]"`).
 - **Arquivo morto**: o que está em `90-Arquivo/` não entra na busca automática por mensagem, mas `cofre_buscar` ainda encontra.
 - **Renomear e mover**: faça no Obsidian, que atualiza os links. Pelo terminal (`mv`) os links quebram.
-- **Um assunto por nota** (algumas centenas de palavras), com pelo menos um `[[link]]` para outra nota ou para o MOC do tema. Nota longa não é proibida (fichamento, relatório), mas ponha títulos `##`: `cofre_ler` de nota com mais de `ler_max_chars` (6000 caracteres) devolve o começo e a lista de seções, e a IA pede só a seção útil (`secao='Etapa 3'`). Sem títulos, ela só consegue ler inteira.
+- **Um assunto por nota** (algumas centenas de palavras), com pelo menos um `[[link]]` para outra nota ou para o MOC do tema. Nota longa não é proibida (fichamento, relatório), mas ponha títulos `##`: `cofre_ler` de nota com mais de `ler_max_chars` (6000 caracteres) devolve o começo e a lista de seções, e a IA pede só a seção útil (`secao='Etapa 3'`). Quando a nota longa aparece no bloco de relevância, o ponteiro já vem com a seção que mais casa com a mensagem (`cofre_ler "..." secao="Rollback"`). Sem títulos, ela só consegue ler inteira.
 - **Inbox**: capture sem formatar e trie depois de um ou dois dias; o que sobrar vira nota em `30-Conhecimento/` reescrita com as suas palavras.
 - **Anexos**: PDF/imagem não é lido pela IA. Crie uma fonte em `50-Fontes/` (template Fonte) com `anexo: "[[arquivo.pdf]]"`, `description` e os trechos importantes em texto.
 
@@ -108,7 +108,7 @@ Qualquer nota Markdown fora de `00-Sistema/` entra na busca, mesmo sem `tipo` ne
 - `tags` e `aliases` com os nomes que você usa para o assunto, inclusive em outro idioma ou abreviado (ex.: `aliases: [teste de intrusão, pentest, pentesting]`), porque a busca é por palavras, não por sinônimos;
 - um assunto por nota funciona melhor que uma nota gigante.
 
-O índice fica em `.cofre/indice.json` (pasta oculta, ignorada pelo Obsidian e pelo git). Pode apagar à vontade; ele é refeito.
+O índice fica fora do vault, no cache do usuário (`~/.cache/cofre/` ou `%LOCALAPPDATA%\cofre\cache`; `COFRE_CACHE` troca a pasta), um por vault e por máquina. Pode apagar à vontade; ele é refeito. Versões anteriores guardavam em `.cofre/indice.json` dentro do vault; o cofre apaga esse arquivo na primeira atualização.
 
 ## Painéis (Bases)
 
@@ -140,9 +140,10 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | Camada | O que acontece |
 | --- | --- |
 | Cofre (Hermes e OpenCode) | Fora do índice, da busca, do bloco de relevância, do contexto, da revisão e da exportação para o NotebookLM. `cofre_ler` recusa o caminho. |
-| Plugin do OpenCode (hooks V1) | Bloqueia `read`, `edit`, `glob`, `grep`, `list`, `bash` e demais ferramentas cujos argumentos apontem para a pasta; tira as linhas com o caminho dela da saída de `glob`/`grep`/`list`/`bash`. |
+| Plugin do OpenCode (V1: `tool.execute.before/after`; V2: `ctx.tool.hook`) | Bloqueia qualquer ferramenta cujos argumentos apontem para a pasta (ler, editar, buscar, terminal) e tira as linhas com o caminho dela das respostas das ferramentas. |
+| Regras nativas do OpenCode V2 | O instalador grava em `permissions` regras `deny` de `read`, `edit` e `external_directory` para a pasta, nas formas absoluta e relativa (a V2 confere caminho relativo quando a sessão roda dentro do vault). Valem mesmo sem o plugin. |
 | Git do vault | `99-Privado/` está no `.gitignore` do template (`cofre init` acrescenta a linha em vaults antigos). O `cofre revisar` dá erro se uma pasta privada estiver versionada ou fora do `.gitignore`. |
-| Hermes | O plugin não bloqueia ferramentas de arquivo/terminal; vale a exclusão do cofre e a regra no protocolo. |
+| Plugin do Hermes | `pre_tool_call` bloqueia ferramentas cujos argumentos apontem para a pasta (o Hermes devolve a mensagem do bloqueio ao modelo); `transform_tool_result` tira as linhas com o caminho dela dos resultados. Erro interno da guarda deixa a ferramenta passar, para não travar o agente. |
 
 Não é criptografia: um agente com terminal livre ainda pode ler o disco por caminhos que nenhuma regra prevê. Senhas, tokens e chaves não ficam nem aqui: use um gerenciador de senhas e registre no vault só onde a credencial fica (o cofre bloqueia credenciais nas escritas e o `cofre revisar` procura nas notas).
 

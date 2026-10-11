@@ -27,6 +27,7 @@ class CofreTeste(unittest.TestCase):
             os.environ.pop(var, None)
         os.environ["XDG_CONFIG_HOME"] = str(self.tmp / "cfg")
         os.environ["APPDATA"] = str(self.tmp / "cfg")
+        os.environ["COFRE_CACHE"] = str(self.tmp / "cache")
         self.vault = self.tmp / "vault"
         os.environ["COFRE_VAULT"] = str(self.vault)
         from contextlib import redirect_stdout

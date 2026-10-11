@@ -14,12 +14,13 @@ fatos, decisões, fontes e skills relacionadas, cada uma com o status.
   com todos os fatos do projeto.
 - Indexa tudo que é nota do vault, inclusive notas livres sem `tipo` e as skills de
   `60-Skills` (SKILL.md e references/). Ignora 00-Sistema, modelos, exemplos e exportações.
-- Índice em cache em `<vault>/.cofre/indice.json`, atualizado só para arquivos alterados,
-  e em memória nos processos que ficam abertos. Avaliação: tests/avaliacao_relevancia.py.
+- Índice em cache por máquina, fora do vault (`arquivo_indice`), atualizado só para arquivos
+  alterados, e em memória nos processos que ficam abertos. Avaliação: tests/avaliacao_relevancia.py.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -36,7 +37,20 @@ from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_l
 VERSAO_INDICE = 7
 RADICAL = 6
 PESO_APROXIMADO = 0.8
-ARQUIVO_INDICE = Path(".cofre") / "indice.json"
+INDICE_ANTIGO = Path(".cofre") / "indice.json"
+
+
+def arquivo_indice(raiz: Path) -> Path:
+    """Fora do vault, no cache do usuário: não entra em sync/git, não aparece no `grep -r` dos agentes
+    e Windows e WSL usando o mesmo vault não reescrevem o mesmo arquivo. COFRE_CACHE troca a pasta."""
+    base = os.environ.get("COFRE_CACHE")
+    if not base:
+        if os.name == "nt":
+            base = str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "cofre" / "cache")
+        else:
+            base = str(Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "cofre")
+    chave = hashlib.sha1(str(Path(raiz).resolve()).encode("utf-8")).hexdigest()[:16]
+    return Path(base) / f"indice-{chave}.json"
 PESO_CAMPO = {"t": 3, "x": 2, "b": 1}
 K1, B = 1.2, 0.75
 MAX_CORPO = 12000
@@ -243,7 +257,7 @@ def carregar_indice(raiz: Path, salvar: bool = True, privadas=()) -> dict[str, d
     if em_memoria and em_memoria[1] == GERACAO[0] and time.monotonic() - em_memoria[0] < MEMORIA_TTL:
         return em_memoria[2]
     antigo: dict = em_memoria[3] if em_memoria else {}
-    arq = raiz / ARQUIVO_INDICE
+    arq = arquivo_indice(raiz)
     if not antigo:
         try:
             dados = json.loads(arq.read_text(encoding="utf-8"))
@@ -267,6 +281,11 @@ def carregar_indice(raiz: Path, salvar: bool = True, privadas=()) -> dict[str, d
         try:
             escrever_atomico(arq, json.dumps({"versao": VERSAO_INDICE, "docs": novo}, ensure_ascii=False,
                                              separators=(",", ":")))
+            velho = raiz / INDICE_ANTIGO
+            if velho.is_file():
+                velho.unlink()
+                if not any(velho.parent.iterdir()):
+                    velho.parent.rmdir()
         except OSError:
             pass
     validos = {k: v for k, v in novo.items() if not v.get("fora")}
@@ -282,6 +301,7 @@ class Achado:
     pontos: float
     termos: frozenset = frozenset()
     no_titulo: frozenset = frozenset()
+    secao: str = ""
 
     @property
     def chave(self) -> str:
@@ -410,14 +430,50 @@ def _curto(texto: str, n: int) -> str:
     return t if len(t) <= n else t[: n - 1].rstrip() + "…"
 
 
+_TIPOS_LONGOS = ("nota", "fonte", "skill-ref", "instrucao")
+
+
+def apontar_secoes(cofre: Cofre, achados: list[Achado], texto: str) -> None:
+    """Nota longa (que o cofre_ler entregaria em partes) ganha no ponteiro a seção que mais casa com a
+    mensagem, para a IA abrir só ela. Só lê os poucos arquivos que já foram escolhidos."""
+    from .contexto import _secoes_md
+
+    pedido = set(termos(str(texto)[:4000]))
+    try:
+        limite = max(1500, int(cofre.config().get("ler_max_chars") or 6000))
+    except (TypeError, ValueError):
+        limite = 6000
+    for a in achados:
+        if a.doc.get("tipo") not in _TIPOS_LONGOS or not pedido:
+            continue
+        try:
+            _, corpo = frontmatter.separar((cofre.raiz / a.rel).read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+        if len(corpo) <= limite:
+            continue
+        secoes_, linhas = _secoes_md(corpo)
+        melhor, nota = "", 0
+        for _nv, titulo, ini, fim in secoes_:
+            pontos = 3 * len(pedido & set(termos(titulo))) + len(pedido & set(termos("\n".join(linhas[ini + 1:fim]))))
+            if pontos > nota:
+                melhor, nota = titulo, pontos
+        a.secao = melhor
+
+
+def _abrir(a: Achado, ref: str) -> str:
+    return f"cofre_ler {ref}" + (f" secao=\"{_curto(a.secao, 60)}\"" if a.secao else "")
+
+
 def linha(a: Achado) -> str:
     d = a.doc
     tipo, st = d.get("tipo"), d.get("status")
+    por_caminho = _abrir(a, '"' + a.rel + '"')
     if tipo == "skill":
         aviso = " [RASCUNHO: passos não testados; avise o usuário antes de seguir]" if d.get("status") == "rascunho" else ""
         return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir){aviso}"
     if tipo == "instrucao":
-        return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: cofre_ler \"{a.rel}\""
+        return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: {por_caminho}"
     if tipo == "moc":
         qtd = f" ({d['links']} notas)" if d.get("links") else ""
         return f"- mapa do assunto: {_curto(d['titulo'], 80)}{qtd} — abra primeiro, ele aponta o resto: cofre_ler \"{a.rel}\""
@@ -426,7 +482,7 @@ def linha(a: Achado) -> str:
         quando = f" — {_curto(d['resumo'], 110)}" if d.get("resumo") and d["resumo"] != d["titulo"] else ""
         return f"- recurso: {_curto(d['titulo'], 70)}{onde}{quando} — detalhes: cofre_ler \"{a.rel}\""
     if tipo == "skill-ref":
-        return f"- referência da skill `{d.get('skill')}`: {_curto(d['titulo'], 80)} — cofre_ler \"{a.rel}\""
+        return f"- referência da skill `{d.get('skill')}`: {_curto(d['titulo'], 80)} — {por_caminho}"
     if tipo == "fato":
         if st == "refutado":
             return f"- {d['id']} [REFUTADO] NÃO é verdade: \"{_curto(d['titulo'], 140)}\" — cofre_ler {d['id']}"
@@ -434,12 +490,12 @@ def linha(a: Achado) -> str:
     if tipo == "decisao":
         return f"- {d['id']} [decisão {_ROTULO.get(st, st)}] {_curto(d['titulo'], 140)}"
     if tipo == "fonte":
-        return f"- {d['id']} [fonte {d.get('origem') or 'externa'}, não é fato] {_curto(d['titulo'], 110)} — cofre_ler {d['id']}"
+        return f"- {d['id'] or a.rel} [fonte {d.get('origem') or 'externa'}, não é fato] {_curto(d['titulo'], 110)} — {_abrir(a, d['id']) if d['id'] else por_caminho}"
     if tipo in ("sessao", "captura", "missao"):
         return f"- {d['id'] or a.rel} [{tipo}] {_curto(d['titulo'], 130)}"
     ref = d["id"] or f"\"{a.rel}\""
     resumo = f": {_curto(d['resumo'], 110)}" if d.get("resumo") and d["resumo"] != d["titulo"] else ""
-    return f"- {tipo or 'nota'} {_curto(d['titulo'], 80)}{resumo} — cofre_ler {ref}"
+    return f"- {tipo or 'nota'} {_curto(d['titulo'], 80)}{resumo} — {_abrir(a, ref)}"
 
 
 def bloco(achados: list[Achado], max_chars: int = 1600) -> str:
@@ -462,6 +518,7 @@ def relevante(cofre: Cofre, texto: str, projeto: str | None = None, excluir=()) 
     # Arquivo morto (90-Arquivo) fica fora da busca automática; cofre_buscar ainda acha.
     achados = buscar(cofre, texto, projeto=projeto, limite=int(cfg.get("relevancia_max_itens", 5)), excluir=excluir,
                      incluir_arquivo=False)
+    apontar_secoes(cofre, achados, texto)
     texto_bloco = bloco(achados, int(cfg.get("relevancia_max_chars", 1600)))
     usados = [a.chave for a in achados if linha(a) in texto_bloco]
     return texto_bloco, usados

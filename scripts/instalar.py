@@ -36,6 +36,68 @@ MARCA_COMANDO = "[cofre]"
 # (verificacao_timeout, padrão 300 s) mais a regressão (até 2x isso).
 TIMEOUT_MCP_S = 1200
 PERSONALITY_HERMES = "spec"
+# OpenCode V2: regras nativas de permissão para as pastas privadas do vault. A V2 guarda as regras
+# em `permissions` (lista ordenada; a última que casa vence). Arquivo dentro do diretório da sessão é
+# conferido pelo caminho relativo a ele (read/edit); fora, pelo absoluto, mais external_directory.
+ACOES_PRIVADAS = ("read", "edit", "external_directory")
+
+
+# Roda com o Python do Hermes (que tem PyYAML): lê/edita o config.yaml com valores estruturados e conserta
+# valores que versões antigas do instalador gravaram como texto JSON.
+MESCLA_YAML_HERMES = r"""
+import json, os, sys, tempfile
+import yaml
+caminho, ops = sys.argv[1], json.loads(sys.stdin.read())
+dados = {}
+if os.path.exists(caminho):
+    with open(caminho, encoding="utf-8") as f:
+        dados = yaml.safe_load(f) or {}
+def texto_json(v):
+    if isinstance(v, str) and v[:1] in "[{":
+        try:
+            return json.loads(v)
+        except ValueError:
+            pass
+    return v
+def no(chave, criar):
+    atual = dados
+    partes = chave.split(".")
+    for p in partes[:-1]:
+        if not isinstance(texto_json(atual.get(p)), dict):
+            if not criar:
+                return None, None
+            atual[p] = {}
+        atual[p] = texto_json(atual[p])
+        atual = atual[p]
+    return atual, partes[-1]
+def lista(v):
+    v = texto_json(v)
+    return list(v) if isinstance(v, list) else ([v] if isinstance(v, str) and v else [])
+saida = {}
+for op, chave, valor in ops:
+    pai, folha = no(chave, op not in ("ler", "unset", "remover"))
+    if op == "ler":
+        saida[chave] = texto_json(pai.get(folha)) if pai is not None else None
+    elif op == "set":
+        pai[folha] = valor
+    elif op == "unset" and pai is not None:
+        pai.pop(folha, None)
+    elif op == "add":
+        pai[folha] = [x for x in lista(pai.get(folha)) if x != valor] + [valor]
+    elif op == "remover" and pai is not None and folha in pai:
+        resto = [x for x in lista(pai.get(folha)) if x != valor]
+        if resto:
+            pai[folha] = resto
+        else:
+            pai.pop(folha)
+if any(op != "ler" for op, _, _ in ops):
+    os.makedirs(os.path.dirname(caminho) or ".", exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(caminho) or ".", prefix=".config.", suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        yaml.safe_dump(dados, f, sort_keys=False, allow_unicode=True)
+    os.replace(tmp, caminho)
+print(json.dumps(saida, ensure_ascii=False))
+"""
 
 
 def _home_dados() -> Path:
@@ -296,12 +358,71 @@ class Instalador:
                 cfg["skills"] = novos
             else:
                 cfg.pop("skills", None)
+        if v2 or remover:
+            mudou = self._permissoes_privadas(cfg, remover or not v2) or mudou
         if mudou:
             self.backup(arq)
             self.escrever(arq, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
         if versao is None and not remover:
             self.aviso("Não consegui ler a versão do OpenCode; gravei o MCP no formato V1 (aceito também pela V2). "
                        "Na V2, para expor as ferramentas direto ao modelo, use mcp.servers.cofre com \"codemode\": false.")
+
+    def _raizes_vault(self) -> list[str]:
+        if not self.vault:
+            return []
+        formas = [str(self.vault)]
+        if getattr(self.a, "vault", None):
+            formas.append(os.path.abspath(os.path.expanduser(self.a.vault)))
+        saida = []
+        for forma in formas:
+            saida += [forma.replace("\\", "/"), forma]
+        return list(dict.fromkeys(saida))
+
+    def _pastas_privadas(self) -> list[str]:
+        try:
+            from cofre.vault import Cofre
+
+            return Cofre(self.vault).pastas_privadas()
+        except Exception:
+            return ["99-Privado"]
+
+    def _permissoes_privadas(self, cfg: dict, remover: bool) -> bool:
+        """Na V2, nega read/edit/external_directory nas pastas privadas. Antes, tira as regras 'deny'
+        do cofre de uma instalação anterior (mesmo que as pastas privadas tenham mudado)."""
+        raizes = self._raizes_vault()
+        regras = cfg.get("permissions")
+        if not raizes or not isinstance(regras, (list, type(None))) or (regras is None and remover):
+            return False
+        pastas = self._pastas_privadas()
+        separadores = ("/", "\\") if WIN else ("/",)
+        relativos = [f"{p.replace('/', sep)}{fim}" for p in pastas for sep in separadores for fim in ("", sep + "*")]
+        finais = tuple(f"{sep}{p.replace('/', sep)}{fim}" for p in {*pastas, "99-Privado"}
+                       for sep in ("/", "\\") for fim in ("", sep + "*"))
+        antigos = {f"{p.replace('/', sep)}{fim}" for p in {*pastas, "99-Privado"} for sep in ("/", "\\")
+                   for fim in ("", sep + "*")}
+
+        def nossa(r) -> bool:
+            alvo = str(r.get("resource", "")) if isinstance(r, dict) else ""
+            return (isinstance(r, dict) and r.get("effect") == "deny" and r.get("action") in ACOES_PRIVADAS
+                    and (any(alvo.startswith(x) for x in raizes) or alvo.endswith(finais) or alvo in antigos))
+
+        novas = [r for r in regras or [] if not nossa(r)]
+        if not remover:
+            for acao in ACOES_PRIVADAS:
+                alvos = list(relativos) if acao != "external_directory" else []
+                for raiz in raizes:
+                    sep = "\\" if "\\" in raiz else "/"
+                    for pasta in pastas:
+                        alvo = raiz.rstrip(sep) + sep + pasta.replace("/", sep)
+                        alvos += [alvo, alvo + sep + "*"]
+                novas += [{"action": acao, "resource": a, "effect": "deny"} for a in dict.fromkeys(alvos)]
+        if novas == (regras or []):
+            return False
+        if novas:
+            cfg["permissions"] = novas
+        else:
+            cfg.pop("permissions", None)
+        return True
 
     # ---- Hermes ----------------------------------------------------------
     def hermes(self, remover: bool = False) -> None:
@@ -326,108 +447,136 @@ class Instalador:
                     self.backup(memoria)
                     self.rodar([str(self.python), str(self.app), "importar-memoria-hermes",
                                 "--hermes-home", str(self.hermes_home)], "levar memória antiga do Hermes para a inbox")
-        if exe:
-            for cmd in self._comandos_hermes(remover):
-                self.rodar([exe, *cmd], "hermes config")
+        python_hermes = self._python_hermes(exe) if exe else None
+        if python_hermes:
+            self._configurar_hermes(python_hermes, remover)
         else:
-            self.pendencias.append(self._instrucoes_hermes_manual(remover))
+            self.pendencias.append(self._instrucoes_hermes_manual(remover, exe))
 
-    def _instrucoes_hermes_manual(self, remover: bool) -> str:
-        if remover:
-            return ("Comando `hermes` não está no PATH. Depois rode `hermes config unset mcp_servers.cofre`, "
-                    "`hermes config unset skills.create_dir` (se apontar para o vault) e remova 'cofre' de "
-                    "plugins.enabled (mantendo os outros itens).")
-        servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
-                    "env": {"COFRE_AGENTE": "hermes"}, "timeout": TIMEOUT_MCP_S}
-        listas = ["'cofre' em plugins.enabled"]
-        if not self.a.manter_skill_obsidian:
-            listas.append("'obsidian' em skills.disabled")
-        escalares = [f"hermes config set skills.create_dir {_citar(str(self.pasta_skills))}",
-                     "hermes config set skills.write_approval true", "hermes config set memory.write_approval true"]
-        if not self.a.manter_memoria_hermes:
-            escalares.append("hermes config set memory.memory_enabled false")
-        return (
-            "Comando `hermes` não está no PATH. Depois rode:\n"
-            f"hermes config set mcp_servers.cofre {_citar(json.dumps(servidor))}\n" + "\n".join(escalares) + "\n"
-            "e acrescente (sem apagar o que já existe) " + ", ".join(listas) + ". "
-            "Se a lista estiver vazia, ex.: hermes config set plugins.enabled '[\"cofre\"]'. "
-            "Ou rode o instalador de novo depois que o `hermes` estiver no PATH."
-        )
+    def _python_hermes(self, exe: str) -> Path | None:
+        """Interpretador do próprio Hermes (traz PyYAML). `hermes config set` não serve para valores
+        estruturados: até a 0.19 ele grava JSON como texto, e o MCP/plugin ficam inválidos."""
+        alvo = Path(exe).resolve()
+        candidatos: list[Path] = []
+        if WIN:
+            candidatos += [alvo.parent / "python.exe", alvo.parent.parent / "python.exe"]
+        else:
+            try:
+                primeira = alvo.read_bytes()[:512].split(b"\n", 1)[0].decode("utf-8", "replace")
+            except OSError:
+                primeira = ""
+            if primeira.startswith("#!"):
+                partes = primeira[2:].strip().split()
+                if partes and Path(partes[0]).name == "env" and len(partes) > 1:
+                    achado = shutil.which(partes[-1])
+                    if achado:
+                        candidatos.append(Path(achado))
+                elif partes:
+                    candidatos.append(Path(partes[0]))
+            candidatos += [alvo.parent / "python3", alvo.parent / "python"]
+        for candidato in candidatos:
+            try:
+                if candidato.is_file() and subprocess.run([str(candidato), "-c", "import yaml"], capture_output=True,
+                                                          timeout=30).returncode == 0:
+                    return candidato
+            except (OSError, subprocess.SubprocessError):
+                continue
+        return None
 
-    def _valor_hermes(self, chave: str):
-        exe = shutil.which("hermes")
-        if not exe or self.seco:
-            return None
+    def _yaml_hermes(self, python_hermes: Path, ops: list) -> dict | None:
+        escreve = any(op[0] != "ler" for op in ops)
+        if escreve and self.seco:
+            for op in ops:
+                self.info(f"hermes config.yaml: {op[0]} {op[1]}")
+            return {}
+        arquivo = self.hermes_home / "config.yaml"
+        if escreve:
+            self.backup(arquivo)
         try:
-            r = subprocess.run([exe, "config", "get", chave, "--json"], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=30)
-            valor = json.loads(r.stdout.strip() or "null") if r.returncode == 0 else None
-        except (OSError, subprocess.SubprocessError, ValueError):
-            valor = None
-        if isinstance(valor, dict) and "value" in valor:
-            valor = valor["value"]
-        return valor
+            r = subprocess.run([str(python_hermes), "-c", MESCLA_YAML_HERMES, str(arquivo)], input=json.dumps(ops),
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        except (OSError, subprocess.SubprocessError) as e:
+            self.aviso(f"não consegui editar {arquivo}: {e}")
+            return None
+        if r.returncode != 0:
+            self.aviso(f"não consegui editar {arquivo}: {(r.stderr or '').strip()[-300:]}")
+            return None
+        if escreve:
+            self.info(f"hermes config.yaml: {', '.join(f'{op[0]} {op[1]}' for op in ops if op[0] != 'ler')}")
+        return json.loads(r.stdout or "{}")
 
-    def _lista_hermes(self, chave: str) -> list:
-        valor = self._valor_hermes(chave)
-        return list(valor) if isinstance(valor, list) else []
-
-    def _comandos_hermes(self, remover: bool) -> list[list[str]]:
-        def mesclar(chave: str, item: str) -> list[str]:
-            atual = [x for x in self._lista_hermes(chave) if x != item]
-            novo = atual if remover else atual + [item]
-            return ["config", "set", chave, json.dumps(novo)]
-
-        nossa = str(self.pasta_skills)
-        atual = self._valor_hermes("skills.create_dir")
-        atual = str(atual) if atual else ""
+    def _configurar_hermes(self, python_hermes: Path, remover: bool) -> None:
+        chave_spec = f"agent.personalities.{PERSONALITY_HERMES}"
+        lidos = self._yaml_hermes(python_hermes, [["ler", "skills.create_dir", None],
+                                                  ["ler", "skills.external_dirs", None],
+                                                  ["ler", chave_spec, None]]) or {}
+        nossa_pasta = str(self.pasta_skills)
+        atual = str(lidos.get("skills.create_dir") or "")
+        externas = lidos.get("skills.external_dirs") if isinstance(lidos.get("skills.external_dirs"), list) else []
+        spec = lidos.get(chave_spec)
+        spec_nossa = isinstance(spec, dict) and MARCA_COMANDO in str(spec.get("description", ""))
+        ops: list = []
         if remover:
-            cmds = [["config", "unset", "mcp_servers.cofre"], mesclar("plugins.enabled", "cofre")]
-            cmds += self._personality_hermes(remover=True)
+            ops += [["unset", "mcp_servers.cofre", None], ["remover", "plugins.enabled", "cofre"]]
+            if spec_nossa:
+                ops.append(["unset", chave_spec, None])
             if atual and self.vault and Path(os.path.expanduser(atual)) == self.pasta_skills:
-                cmds.append(["config", "unset", "skills.create_dir"])
-            elif nossa in self._lista_hermes("skills.external_dirs"):
-                cmds.append(mesclar("skills.external_dirs", nossa))
-            return cmds
+                ops.append(["unset", "skills.create_dir", None])
+            elif nossa_pasta in externas:
+                ops.append(["remover", "skills.external_dirs", nossa_pasta])
+            self._yaml_hermes(python_hermes, ops)
+            return
         servidor = {"command": str(self.python), "args": [str(self.app), "mcp"],
                     "env": {"COFRE_AGENTE": "hermes"}, "timeout": TIMEOUT_MCP_S}
-        cmds = [
-            ["config", "set", "mcp_servers.cofre", json.dumps(servidor)],
-            mesclar("plugins.enabled", "cofre"),
-            ["config", "set", "skills.write_approval", "true"],
-            ["config", "set", "memory.write_approval", "true"],
-        ]
+        ops += [["set", "mcp_servers.cofre", servidor], ["add", "plugins.enabled", "cofre"],
+                ["set", "skills.write_approval", True], ["set", "memory.write_approval", True]]
         local = self.hermes_home / "skills"
         if not atual or Path(os.path.expanduser(atual)) in (self.pasta_skills, local):
-            cmds.append(["config", "set", "skills.create_dir", nossa])
+            ops.append(["set", "skills.create_dir", nossa_pasta])
         else:
             self.aviso(f"skills.create_dir do Hermes já aponta para {atual}; mantive e adicionei o vault em external_dirs.")
-            cmds.append(mesclar("skills.external_dirs", nossa))
+            ops.append(["add", "skills.external_dirs", nossa_pasta])
         if not self.a.manter_skill_obsidian:
-            cmds.append(mesclar("skills.disabled", "obsidian"))
+            ops.append(["add", "skills.disabled", "obsidian"])
         if not self.a.manter_memoria_hermes:
-            cmds.append(["config", "set", "memory.memory_enabled", "false"])
-        cmds += self._personality_hermes(remover=False)
-        return cmds
+            ops.append(["set", "memory.memory_enabled", False])
+        if spec and not spec_nossa:
+            self.aviso(f"Já existe a personality '{PERSONALITY_HERMES}' no Hermes; mantive a sua.")
+        else:
+            ops.append(["set", chave_spec, self._personality_spec()])
+        self._yaml_hermes(python_hermes, ops)
 
-    def _personality_hermes(self, remover: bool) -> list[list[str]]:
+    def _personality_spec(self) -> dict:
         """Personality 'spec' no Hermes (equivalente ao agente spec do OpenCode): /personality spec."""
-        atual = self._valor_hermes(f"agent.personalities.{PERSONALITY_HERMES}")
-        nossa = isinstance(atual, dict) and MARCA_COMANDO in str(atual.get("description", ""))
-        if atual and not nossa:
-            if not remover:
-                self.aviso(f"Já existe a personality '{PERSONALITY_HERMES}' no Hermes; mantive a sua.")
-            return []
-        if remover:
-            return [["config", "unset", f"agent.personalities.{PERSONALITY_HERMES}"]] if nossa else []
         if str(RAIZ) not in sys.path:
             sys.path.insert(0, str(RAIZ))
         from cofre.specs import INSTRUCOES_MODO_SPEC
 
-        valor = {"description": f"{MARCA_COMANDO} Spec-Driven Development com o cofre: especifica, espera aprovação, "
-                                "uma tarefa por vez com verificação",
-                 "system_prompt": INSTRUCOES_MODO_SPEC}
-        return [["config", "set", f"agent.personalities.{PERSONALITY_HERMES}", json.dumps(valor, ensure_ascii=False)]]
+        return {"description": f"{MARCA_COMANDO} Spec-Driven Development com o cofre: especifica, espera aprovação, "
+                               "uma tarefa por vez com verificação",
+                "system_prompt": INSTRUCOES_MODO_SPEC}
+
+    def _instrucoes_hermes_manual(self, remover: bool, exe: str | None) -> str:
+        motivo = ("Não achei o Python do Hermes (com PyYAML) a partir do comando `hermes`." if exe
+                  else "Comando `hermes` não está no PATH.")
+        arquivo = self.hermes_home / "config.yaml"
+        if remover:
+            return (f"{motivo} Edite {arquivo}: apague `mcp_servers.cofre`, tire 'cofre' de `plugins.enabled` "
+                    "e `skills.create_dir` se apontar para o vault.")
+        trecho = (
+            "mcp_servers:\n  cofre:\n"
+            f"    command: {json.dumps(str(self.python))}\n"
+            f"    args: [{json.dumps(str(self.app))}, \"mcp\"]\n"
+            "    env: {COFRE_AGENTE: hermes}\n"
+            f"    timeout: {TIMEOUT_MCP_S}\n"
+            "plugins:\n  enabled: [cofre]        # mantenha os que já estavam\n"
+            f"skills:\n  create_dir: {json.dumps(str(self.pasta_skills))}\n  write_approval: true\n"
+            + ("  disabled: [obsidian]\n" if not self.a.manter_skill_obsidian else "")
+            + "memory:\n  write_approval: true\n"
+            + ("  memory_enabled: false\n" if not self.a.manter_memoria_hermes else "")
+        )
+        return (f"{motivo} Acrescente ao {arquivo} (mesclando com o que já existe), ou rode o instalador de novo "
+                f"depois que o `hermes` estiver no PATH:\n{trecho}")
 
     # ---- opcionais: Claude Code CLI e Codex CLI -----------------------------
     def claude_code(self, remover: bool = False) -> None:

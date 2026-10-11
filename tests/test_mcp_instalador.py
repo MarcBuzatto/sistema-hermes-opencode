@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import subprocess
@@ -131,31 +132,97 @@ class TestInstalador(CofreTeste):
         self.assertFalse(cfg["mcp"]["servers"]["cofre"]["codemode"])
         self.assertNotIn("timeout", cfg["mcp"]["servers"]["cofre"], "V2 já tem 12 h de padrão; a chave V1 reduziria")
         self.assertFalse((oc / "skills").exists())
+        privada = str(vault.resolve() / "99-Privado")
+        regras = {(r["action"], r["resource"]) for r in cfg["permissions"] if r["effect"] == "deny"}
+        for acao in ("read", "edit", "external_directory"):
+            self.assertIn((acao, privada), regras)
+            self.assertIn((acao, privada + "/*"), regras)
+        for acao in ("read", "edit"):
+            self.assertIn((acao, "99-Privado/*"), regras, "sessão aberta dentro do vault: a V2 confere o caminho relativo")
+        self.assertNotIn(("external_directory", "99-Privado/*"), regras)
+        self.assertNotIn("permission", cfg, "a V2 usa a lista 'permissions'")
+
+        # Regras do usuário ficam; as do cofre são refeitas no fim (a última que casa vence na V2).
+        cfg["permissions"].insert(0, {"action": "shell", "resource": "rm *", "effect": "deny"})
+        cfg["permissions"].append({"action": "read", "resource": "*", "effect": "allow"})
+        (oc / "opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        cofre_cfg = vault / "00-Sistema" / "config.md"
+        cofre_cfg.write_text(cofre_cfg.read_text(encoding="utf-8").replace(
+            "pastas_privadas: []", "pastas_privadas:\n  - 40-Clientes/Confidencial"), encoding="utf-8")
+        self.rodar(env, "--vault", str(vault), "--sem-hermes", "--sem-path")
+        cfg = json.loads((oc / "opencode.json").read_text(encoding="utf-8"))
+        acoes = [(r["action"], r["resource"], r["effect"]) for r in cfg["permissions"]]
+        self.assertEqual(acoes[0], ("shell", "rm *", "deny"))
+        self.assertIn(("read", "*", "allow"), acoes)
+        ultimo_do_usuario = acoes.index(("read", "*", "allow"))
+        nossas = [i for i, a in enumerate(acoes) if a[2] == "deny" and a[1] != "rm *"]
+        self.assertTrue(nossas and min(nossas) > ultimo_do_usuario, acoes)
+        absolutas = [a for a in acoes if a[2] == "deny" and a[1].startswith(str(vault.resolve()))]
+        self.assertEqual(len(absolutas), 12, "sem duplicar regras ao reinstalar; 2 pastas x 3 ações x 2 padrões")
+        self.assertIn(("read", str(vault.resolve() / "40-Clientes" / "Confidencial" / "*"), "deny"), acoes)
+
         self.rodar(env, "--desinstalar")
         cfg = json.loads((oc / "opencode.json").read_text(encoding="utf-8"))
         self.assertNotIn("skills", cfg)
+        self.assertEqual([(r["action"], r["resource"]) for r in cfg["permissions"]],
+                         [("shell", "rm *"), ("read", "*")], "desinstalar tira só as regras do cofre")
 
     @unittest.skipIf(os.name == "nt", "binário falso em shell script")
-    def test_hermes_recebe_timeout_e_personality_spec(self):
+    def hermes_falso(self, com_yaml=True):
+        """`hermes` cujo interpretador (shebang) é este Python: o instalador edita o config.yaml com ele."""
+        binarios = self.tmp / "bin"
+        binarios.mkdir(exist_ok=True)
+        falso = binarios / "hermes"
+        interpretador = sys.executable if com_yaml else "/bin/sh"
+        falso.write_text(f"#!{interpretador}\nimport sys\n", encoding="utf-8")
+        falso.chmod(0o755)
+        return binarios
+
+    @unittest.skipIf(os.name == "nt", "binário falso com shebang")
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML não instalado (o Hermes traz)")
+    def test_hermes_config_estruturado_e_conserto_de_json_em_texto(self):
+        import yaml
+
         home = self.tmp / "home"
         (home / ".hermes").mkdir(parents=True)
-        binarios = self.tmp / "bin"
-        binarios.mkdir()
-        registro = self.tmp / "hermes.log"
-        falso = binarios / "hermes"
-        falso.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{registro}"\n'
-                         'if [ "$2" = "get" ]; then echo null; fi\n', encoding="utf-8")
-        falso.chmod(0o755)
+        # Config deixada por versão antiga do instalador: valores gravados como TEXTO JSON (Hermes 0.19).
+        (home / ".hermes" / "config.yaml").write_text(
+            "model:\n  provider: custom\n  default: meu-modelo\n"
+            "plugins:\n  enabled: '[\"outro\", \"cofre\"]'\n"
+            "mcp_servers:\n  cofre: '{\"command\": \"x\"}'\n  github: {command: npx}\n", encoding="utf-8")
         env = self.ambiente(home)
-        env["PATH"] = str(binarios) + os.pathsep + env["PATH"]
+        env["PATH"] = str(self.hermes_falso()) + os.pathsep + env["PATH"]
         self.rodar(env, "--vault", str(home / "Cofre"), "--sem-opencode", "--sem-path")
-        chamadas = registro.read_text(encoding="utf-8")
-        self.assertIn('"timeout": 1200', chamadas)
-        linha = next(x for x in chamadas.splitlines() if x.startswith("config set agent.personalities.spec "))
-        valor = json.loads(linha.split(" ", 3)[3])
-        self.assertIn("[cofre]", valor["description"])
-        self.assertIn("MODO SPEC", valor["system_prompt"])
+        cfg = yaml.safe_load((home / ".hermes" / "config.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(cfg["model"], {"provider": "custom", "default": "meu-modelo"}, "config do usuário intacta")
+        servidor = cfg["mcp_servers"]["cofre"]
+        self.assertIsInstance(servidor, dict)
+        self.assertEqual(servidor["timeout"], 1200)
+        self.assertEqual(servidor["args"][-1], "mcp")
+        self.assertEqual(cfg["mcp_servers"]["github"], {"command": "npx"})
+        self.assertEqual(cfg["plugins"]["enabled"], ["outro", "cofre"])
+        self.assertEqual(cfg["skills"]["disabled"], ["obsidian"])
+        self.assertIs(cfg["memory"]["memory_enabled"], False)
+        spec = cfg["agent"]["personalities"]["spec"]
+        self.assertIn("[cofre]", spec["description"])
+        self.assertIn("MODO SPEC", spec["system_prompt"])
 
+        self.rodar(env, "--desinstalar")
+        cfg = yaml.safe_load((home / ".hermes" / "config.yaml").read_text(encoding="utf-8"))
+        self.assertNotIn("cofre", cfg["mcp_servers"])
+        self.assertEqual(cfg["plugins"]["enabled"], ["outro"])
+        self.assertNotIn("spec", (cfg.get("agent") or {}).get("personalities") or {})
+
+    @unittest.skipIf(os.name == "nt", "binário falso com shebang")
+    def test_hermes_sem_python_com_yaml_recebe_instrucao_em_yaml(self):
+        home = self.tmp / "home"
+        (home / ".hermes").mkdir(parents=True)
+        env = self.ambiente(home)
+        env["PATH"] = str(self.hermes_falso(com_yaml=False)) + os.pathsep + env["PATH"]
+        saida = self.rodar(env, "--vault", str(home / "Cofre"), "--sem-opencode", "--sem-path")
+        self.assertIn("mcp_servers:\n  cofre:", saida)
+        self.assertIn("timeout: 1200", saida)
+        self.assertFalse((home / ".hermes" / "config.yaml").exists(), "sem PyYAML não escreve nada pela metade")
 
 if __name__ == "__main__":
     unittest.main()

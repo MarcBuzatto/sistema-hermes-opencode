@@ -108,6 +108,17 @@ class TestPesquisaObsidian(CofreTeste):
         self.assertIn("não existe nesta nota", contexto.ler(self.cofre, ref, secao="kubernetes"))
         self.assertGreater(contexto.ler(self.cofre, ref, secao="tudo").count("passo detalhado"), 2000)
 
+    def test_relevancia_aponta_a_secao_da_nota_longa(self):
+        partes = "\n\n".join(f"## Etapa {i}\n" + ("configuração geral do servidor " * 120) for i in range(1, 9))
+        partes += "\n\n## Rollback de versão\nComo voltar a versão anterior quando o deploy quebra: " + ("passo " * 50)
+        self.nota("30-Conhecimento/Devops/Manual de deploy.md", "# Manual de deploy\n\nResumo curto.\n\n" + partes)
+        bloco = self.rel("como faço rollback do deploy quando quebra")
+        self.assertIn('cofre_ler "30-Conhecimento/Devops/Manual de deploy.md" secao="Rollback de versão"', bloco)
+        # Nota curta não ganha seção no ponteiro.
+        self.nota("30-Conhecimento/Devops/Checklist curto.md", "# Checklist curto\n\n## Rollback\nvoltar versão\n")
+        self.assertNotIn('Checklist curto.md" secao=', self.rel("checklist curto de rollback"))
+        self.assertIn('secao="Rollback de versão"', contexto.buscar(self.cofre, "rollback do deploy"))
+
     def test_nota_curta_vem_inteira(self):
         self.nota("30-Conhecimento/Curta.md", "# Curta\n\n## A\ntexto a\n\n## B\ntexto b\n")
         texto = contexto.ler(self.cofre, "30-Conhecimento/Curta")

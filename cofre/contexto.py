@@ -290,6 +290,7 @@ def buscar(cofre: Cofre, consulta: str, projeto: str | None = None, tipo: str | 
     if proj:
         achados = [a for a in achados if a.doc.get("projeto") in (proj.nome, None)]
     achados = achados[: max(1, int(limite))]
+    relevancia.apontar_secoes(cofre, achados, consulta)
     if not achados:
         return f"Nada encontrado para '{consulta}'. Lembre: ausência no cofre não prova que algo é falso."
     return f"Resultados para '{consulta}':\n" + "\n".join(

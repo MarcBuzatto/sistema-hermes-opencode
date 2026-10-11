@@ -63,7 +63,7 @@ Se preferir usar uma pasta dentro de um vault que você já tem, passe esse cami
 
 ### 5. Reiniciar os agentes
 
-Feche e abra de novo o OpenCode e o Hermes (o Hermes monta o prompt no início da sessão; o PATH novo só vale em terminais novos). No Hermes, confira com `hermes plugins list` (o `cofre` deve aparecer como enabled) e `hermes config get mcp_servers.cofre`.
+Feche e abra de novo o OpenCode e o Hermes (o Hermes monta o prompt no início da sessão; o PATH novo só vale em terminais novos). No Hermes, confira com `hermes plugins list` (o `cofre` deve aparecer como enabled) e `hermes mcp list` (o `cofre` deve aparecer como enabled). Se o Hermes foi instalado com `pip`, instale o suporte a MCP: `pip install "hermes-agent[mcp]"`.
 
 ### 6. Vincular projetos
 

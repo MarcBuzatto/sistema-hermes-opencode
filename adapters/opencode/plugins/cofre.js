@@ -8,7 +8,10 @@
 // - O contexto fica em cache por 30 s, mas é refeito quando aparece chamada nova a uma
 //   ferramenta do cofre (a linha AGORA da spec muda a cada tarefa).
 // - Pasta privada do vault (99-Privado e pastas_privadas): bloqueia ferramentas que apontem
-//   para ela e tira as linhas com o caminho dela da saída de glob/grep/list/bash (hooks V1).
+//   para ela e tira as linhas com o caminho dela das saídas (V1: tool.execute.before/after;
+//   V2: ctx.tool.hook execute.before/after). Mesma regra de cofre/privado.py (plugin do
+//   Hermes). Na V2 o instalador também grava regras nativas de permissão (read/edit/
+//   external_directory), que valem mesmo sem o plugin.
 // Gerado pelo instalador do cofre.
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
@@ -41,10 +44,10 @@ function rodar(args, entrada) {
   })
 }
 
+const NOMES_FERRAMENTAS = "No OpenCode as ferramentas do cofre têm o prefixo cofre_ (cofre_ler = cofre_cofre_ler)."
 const MSG_PRIVADO =
   "Bloqueado pelo cofre: esse caminho fica numa pasta privada do usuário (99-Privado ou pastas_privadas do cofre). " +
   "Não tente outro caminho nem outro comando; se precisar do conteúdo, peça ao usuário."
-const FERRAMENTAS_LISTAGEM = new Set(["glob", "grep", "list", "bash"])
 const normal = (s) => String(s).replace(/\\/g, "/").toLowerCase()
 
 function textosDe(valor, saida = []) {
@@ -56,7 +59,17 @@ function textosDe(valor, saida = []) {
 
 // Caminhos privados vindos do cofre. Nome relativo (99-Privado) só conta quando o texto também
 // aponta para o vault ou a sessão roda dentro dele, para não bloquear nada em outros projetos.
-async function carregarPrivado(dir) {
+const cachePrivado = new Map()
+function carregarPrivado(dir) {
+  const chave = String(dir ?? "")
+  const item = cachePrivado.get(chave)
+  if (item && Date.now() - item.t < TTL_MS) return item.promessa
+  const promessa = lerPrivado(dir)
+  cachePrivado.set(chave, { t: Date.now(), promessa })
+  return promessa
+}
+
+async function lerPrivado(dir) {
   try {
     const d = JSON.parse((await rodar(["privado", "--json"])) || "{}")
     const casa = normal(homedir())
@@ -79,6 +92,40 @@ function mencionaPrivado(texto, pv) {
   const n = normal(texto)
   if (pv.absolutas.some((p) => n.includes(p))) return true
   return (pv.naVault || pv.vault.some((v) => n.includes(v))) && pv.relativas.some((p) => n.includes(p))
+}
+
+const linhasSemPrivado = (texto, pv) =>
+  texto
+    .split("\n")
+    .filter((ln) => !mencionaPrivado(ln, pv))
+    .join("\n")
+
+function valorSemPrivado(valor, pv) {
+  if (typeof valor === "string") return linhasSemPrivado(valor, pv)
+  if (Array.isArray(valor)) return valor.map((v) => valorSemPrivado(v, pv))
+  if (valor && typeof valor === "object")
+    return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, valorSemPrivado(v, pv)]))
+  return valor
+}
+
+// Saída em JSON numa linha só é filtrada por dentro dos textos, sem quebrar a estrutura.
+function semLinhasPrivadas(texto, pv) {
+  const inicio = texto.trimStart()[0]
+  if (inicio === "{" || inicio === "[") {
+    try {
+      return JSON.stringify(valorSemPrivado(JSON.parse(texto), pv))
+    } catch {}
+  }
+  return linhasSemPrivado(texto, pv)
+}
+
+function resultadoSemPrivado(r, pv) {
+  const novo = { ...r }
+  if (typeof r.content === "string") novo.content = semLinhasPrivadas(r.content, pv)
+  else if (Array.isArray(r.content))
+    novo.content = r.content.map((c) => (c?.type === "text" ? { ...c, text: semLinhasPrivadas(String(c.text), pv) } : c))
+  if (typeof r.output === "string") novo.output = semLinhasPrivadas(r.output, pv)
+  return novo
 }
 
 function tocaPrivado(args, pv, dir) {
@@ -151,7 +198,8 @@ async function contexto(dir, estado = {}) {
   if (item && Date.now() - item.t < TTL_MS) return item.texto
   const args = ["contexto", "--cwd", dir, "--modo", "sistema", "--sem-checkpoint", String(estado.semCheckpoint ?? 0)]
   if (agente) args.push("--agente-ativo", agente)
-  const texto = await rodar(args)
+  const bruto = await rodar(args)
+  const texto = bruto ? `${bruto}\n${NOMES_FERRAMENTAS}` : ""
   if (cacheContexto.size > 100) cacheContexto.clear()
   cacheContexto.set(chave, { t: Date.now(), texto })
   return texto
@@ -189,24 +237,32 @@ export default {
         event.system.push({ type: "text", text: [AVISO_COMPACTACAO, texto].filter(Boolean).join("\n\n") })
       } catch {}
     })
+    if (typeof ctx.tool?.hook !== "function") return
+    await ctx.tool.hook("execute.before", async (event) => {
+      const dir = await diretorioDaSessao(ctx, event.sessionID).catch(() => undefined)
+      const pv = await carregarPrivado(dir)
+      if (pv && tocaPrivado(event.input, pv, dir)) throw new Error(MSG_PRIVADO)
+    })
+    await ctx.tool.hook("execute.after", async (event) => {
+      try {
+        if (event.status !== "completed" || !event.result) return
+        const pv = await carregarPrivado(await diretorioDaSessao(ctx, event.sessionID))
+        if (pv) event.result = resultadoSemPrivado(event.result, pv)
+      } catch {}
+    })
   },
   async server(input) {
     // OpenCode V1 só enxerga ~/.config/opencode/skills/*/SKILL.md: copia as skills do vault ao iniciar.
     if (DESTINO_SKILLS) rodar(["skills", "sincronizar", "--destino", DESTINO_SKILLS])
     const dir = input?.directory || input?.worktree
-    const privado = carregarPrivado(dir)
     return {
       "tool.execute.before": async (_entrada, saida) => {
-        const pv = await privado
+        const pv = await carregarPrivado(dir)
         if (pv && tocaPrivado(saida?.args, pv, dir)) throw new Error(MSG_PRIVADO)
       },
-      "tool.execute.after": async (entrada, saida) => {
-        const pv = await privado
-        if (!pv || !FERRAMENTAS_LISTAGEM.has(String(entrada?.tool ?? "")) || typeof saida?.output !== "string") return
-        saida.output = saida.output
-          .split("\n")
-          .filter((ln) => !mencionaPrivado(ln, pv))
-          .join("\n")
+      "tool.execute.after": async (_entrada, saida) => {
+        const pv = await carregarPrivado(dir)
+        if (pv && typeof saida?.output === "string") saida.output = semLinhasPrivadas(saida.output, pv)
       },
       "experimental.chat.messages.transform": async (_entrada, saida) => {
         try {
