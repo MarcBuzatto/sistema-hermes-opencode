@@ -195,12 +195,36 @@ class Cofre:
         return [n for n in self.notas() if n.tipo == tipo]
 
     def por_id(self, ident: str) -> Nota | None:
-        alvo = str(ident).strip().strip("[]").upper()
-        alvo = alvo.split(" ")[0]
+        from .normalizar import extrair_id
+
+        alvo = extrair_id(ident) or str(ident).strip().strip("[]").upper().split(" ")[0]
         for nota in self.notas():
             if nota.id.upper() == alvo:
                 return nota
         return None
+
+    def sugestoes(self, ref, tipo: str | None = None, limite: int = 3) -> str:
+        """Texto com IDs parecidos (erro de digitação) ou notas cujo texto casa com `ref`."""
+        from .normalizar import extrair_id
+
+        candidatos = [n for n in self.notas() if n.id and (tipo is None or n.tipo == tipo)]
+        ident = extrair_id(ref)
+        achados = []
+        if ident:
+            from .relevancia import _distancia_ate_1
+
+            achados = [n for n in candidatos if _distancia_ate_1(n.id.upper(), ident)][:limite]
+        if not achados and ref and len(str(ref).split()) >= 2:
+            from .relevancia import buscar
+
+            tipos = [tipo] if tipo else None
+            ids = {a.doc.get("id") for a in buscar(self, str(ref), limite=limite, tipos=tipos, so_fortes=False)}
+            achados = [n for n in candidatos if n.id in ids]
+        if not achados:
+            return ""
+        def titulo(n: Nota) -> str:
+            return str(n.meta.get("afirmacao") or n.meta.get("titulo") or n.nome)[:90]
+        return " Talvez você quis dizer: " + "; ".join(f"{n.id} \"{titulo(n)}\"" for n in achados) + "."
 
     def por_nome(self, nome: str) -> Nota | None:
         for nota in self.notas():
@@ -214,6 +238,15 @@ class Cofre:
         if not alvo:
             return None
         return self.por_nome(alvo) or self.por_id(alvo)
+
+    def exigir(self, ref, tipo: str, rotulo: str) -> Nota:
+        nota = self.resolver_ref(ref)
+        if nota and nota.tipo == tipo:
+            return nota
+        raise ErroCofre(
+            f"{rotulo} '{ref}' não encontrado(a). Passe o ID exato (ex.: {PREFIXOS.get(tipo, 'X')}-7K3PQ)."
+            + self.sugestoes(ref, tipo) + " Use cofre_buscar para achar o ID."
+        )
 
     def projetos(self) -> dict[str, Nota]:
         return {n.nome: n for n in self.por_tipo("projeto")}

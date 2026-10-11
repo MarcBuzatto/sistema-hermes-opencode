@@ -42,15 +42,49 @@ class Evidencia:
         return f"`{self.tipo}` {self.ref} — \"{self.trecho}\""
 
 
+_CHAVES_TIPO = ("tipo", "type", "kind", "fonte")
+_CHAVES_REF = ("ref", "referencia", "path", "caminho", "file", "arquivo", "source", "url", "link", "command",
+               "comando", "cmd", "id", "nota")
+_CHAVES_TRECHO = ("trecho", "excerpt", "quote", "citacao", "snippet", "text", "texto", "output", "saida", "conteudo",
+                  "content", "linha")
+_TIPO_ALIAS = {"file": "arquivo", "path": "arquivo", "command": "comando", "cmd": "comando", "shell": "comando",
+               "user": "usuario", "usuário": "usuario", "conversa": "usuario", "doc": "url", "link": "url",
+               "documentacao": "url", "note": "nota", "terminal": "comando", "saida": "comando"}
+_FORMATO_LIVRE = re.compile(r"^\s*(arquivo|comando|url|usuario|nota)\s*[:=]\s*(.+?)\s*(?:->|=>|—|--)\s*(.+)$", re.I | re.S)
+
+
+def _primeiro(d: dict, chaves: tuple) -> str:
+    baixo = {str(k).strip().lower(): v for k, v in d.items()}
+    for c in chaves:
+        if baixo.get(c) not in (None, ""):
+            return str(baixo[c]).strip()
+    return ""
+
+
+def _inferir_tipo(ref: str) -> str:
+    r = ref.strip()
+    if re.match(r"^https?://", r):
+        return "url"
+    if r.lower() in ("conversa", "chat", "usuario", "user"):
+        return "usuario"
+    if re.match(r"^[FDSMCNE]-?[0-9A-Z]{5}$", r, re.I):
+        return "nota"
+    if " " not in r.split(":")[0] and ("/" in r or "\\" in r or re.search(r"\.[a-z0-9]{1,6}(:\d+)?$", r, re.I)):
+        return "arquivo"
+    return "comando"
+
+
 def ler_evidencia(item) -> Evidencia:
     if isinstance(item, Evidencia):
         ev = item
     elif isinstance(item, dict):
-        ev = Evidencia(
-            str(item.get("tipo", "")).strip().lower(),
-            str(item.get("ref", "")).strip(),
-            str(item.get("trecho", "")).strip(),
-        )
+        ref = _primeiro(item, _CHAVES_REF)
+        tipo = _primeiro(item, _CHAVES_TIPO).lower()
+        tipo = _TIPO_ALIAS.get(tipo, tipo) or (_inferir_tipo(ref) if ref else "")
+        ev = Evidencia(tipo, ref, _primeiro(item, _CHAVES_TRECHO))
+    elif _FORMATO_LIVRE.match(str(item)) and " :: " not in str(item) and "::" not in str(item):
+        m = _FORMATO_LIVRE.match(str(item))
+        ev = Evidencia(m.group(1).lower(), m.group(2).strip(), m.group(3).strip())
     else:
         bruto = str(item)
         if SEP in bruto:
@@ -62,12 +96,16 @@ def ler_evidencia(item) -> Evidencia:
         partes = [p.strip() for p in partes]
         while len(partes) < 3:
             partes.append("")
-        ev = Evidencia(partes[0].lower(), partes[1], partes[2])
+        tipo = _TIPO_ALIAS.get(partes[0].lower(), partes[0].lower())
+        ev = Evidencia(tipo, partes[1], partes[2])
     ev.trecho = ev.trecho.strip().strip("`").strip()
+    ev.tipo = _TIPO_ALIAS.get(ev.tipo, ev.tipo)
     if ev.tipo not in TIPOS_EVIDENCIA:
         raise ErroCofre(
             f"Tipo de evidência inválido: '{ev.tipo}'. Use um de: "
             + ", ".join(f"{k} ({v})" for k, v in TIPOS_EVIDENCIA.items())
+            + ". Exemplo: {\"tipo\": \"arquivo\", \"ref\": \"/caminho/absoluto/package.json:5\", "
+              "\"trecho\": \"\\\"next\\\": \\\"15.5.4\\\"\"}"
         )
     if not ev.ref:
         raise ErroCofre(f"Evidência '{ev.tipo}' sem 'ref'. Esperado: {TIPOS_EVIDENCIA[ev.tipo]}.")

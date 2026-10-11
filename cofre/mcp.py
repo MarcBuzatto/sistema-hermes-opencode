@@ -7,6 +7,7 @@ Mensagens são JSON-RPC 2.0 delimitadas por linha, conforme o transporte stdio d
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -16,6 +17,7 @@ from urllib.parse import unquote, urlparse
 from . import __version__
 from .config import ErroCofre, resolver_vault
 from .ferramentas import POR_NOME, descricoes_mcp
+from .normalizar import normalizar
 from .registrar import Autor
 from .vault import Cofre
 
@@ -50,6 +52,7 @@ class Servidor:
         self.cliente_tem_roots = False
         self.raiz_workspace: str | None = None
         self._seq = 0
+        self._ultima_falha: tuple[str, int] | None = None
 
     # ---- E/S -------------------------------------------------------------
     def enviar(self, msg: dict) -> None:
@@ -77,25 +80,42 @@ class Servidor:
         nome = os.environ.get("COFRE_AGENTE") or self.cliente or "agente"
         return Autor(nome=nome, humano=False, modelo=(args or {}).get("agente"))
 
-    def chamar(self, nome: str, args: dict, meta: dict | None = None) -> dict:
-        ferramenta = POR_NOME.get(nome)
+    def chamar(self, nome: str, args, meta: dict | None = None) -> dict:
+        nome = str(nome or "").strip()
+        ferramenta = POR_NOME.get(nome) or POR_NOME.get(nome.split("__")[-1]) or POR_NOME.get("cofre_" + nome)
         if not ferramenta:
-            return {"content": [{"type": "text", "text": f"Ferramenta desconhecida: {nome}"}], "isError": True}
+            return self._erro(f"Ferramenta desconhecida: {nome}. Disponíveis: {', '.join(POR_NOME)}.", nome, args)
+        args = normalizar(args, ferramenta["inputSchema"])
+        externa = (meta or {}).get("ai.opencode/sessionID")
+        if externa:
+            args["_sessao_externa"] = str(externa)
+        faltando = [p for p in ferramenta["inputSchema"].get("required", []) if args.get(p) in (None, "", [])]
+        if faltando:
+            return self._erro(f"Faltou o parâmetro obrigatório: {', '.join(faltando)}.", nome, args, ferramenta)
         try:
             cofre = Cofre(resolver_vault(self.vault_arg))
-            args = dict(args or {})
-            externa = (meta or {}).get("ai.opencode/sessionID")
-            if externa:
-                args["_sessao_externa"] = str(externa)
             texto = ferramenta["handler"](cofre, self.autor(args), args, self.cwd())
+            self._ultima_falha = None
             return {"content": [{"type": "text", "text": texto}], "isError": False}
         except ErroCofre as e:
-            return {"content": [{"type": "text", "text": str(e)}], "isError": True}
-        except KeyError as e:
-            return {"content": [{"type": "text", "text": f"Parâmetro obrigatório ausente: {e}"}], "isError": True}
+            return self._erro(str(e), nome, args)
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
-            return {"content": [{"type": "text", "text": f"Erro interno do cofre: {type(e).__name__}: {e}"}], "isError": True}
+            return self._erro(f"Erro interno do cofre: {type(e).__name__}: {e}", nome, args)
+
+    def _erro(self, texto: str, nome: str, args, ferramenta: dict | None = None) -> dict:
+        if ferramenta and ferramenta.get("exemplo"):
+            texto += f" Exemplo de chamada correta: {ferramenta['exemplo']}"
+        assinatura = hashlib.sha1(
+            (nome + json.dumps(args, sort_keys=True, ensure_ascii=False, default=str)).encode("utf-8")).hexdigest()
+        repeticoes = self._ultima_falha[1] + 1 if self._ultima_falha and self._ultima_falha[0] == assinatura else 1
+        self._ultima_falha = (assinatura, repeticoes)
+        if repeticoes >= 3:
+            texto = (
+                f"PARE: você repetiu exatamente a mesma chamada que falhou {repeticoes} vezes. Repetir não vai "
+                "funcionar. Leia o erro abaixo, mude a chamada ou pergunte ao usuário.\n\n" + texto
+            )
+        return {"content": [{"type": "text", "text": texto}], "isError": True}
 
     def tratar(self, msg: dict) -> None:
         metodo = msg.get("method")

@@ -309,9 +309,7 @@ def atualizar_fato(
     cofre: Cofre, autor: Autor, ident: str, acao: str, evidencias=None, motivo: str = "",
     afirmacao_correta: str | None = None, cwd: str | None = None,
 ) -> Resultado:
-    nota = cofre.resolver_ref(ident)
-    if not nota or nota.tipo != "fato":
-        raise ErroCofre(f"Fato '{ident}' não encontrado. Use cofre_buscar para achar o ID correto.")
+    nota = cofre.exigir(ident, "fato", "Fato")
     acao = (acao or "").strip().lower()
     if acao not in ACOES_FATO:
         raise ErroCofre(f"Ação inválida '{acao}'. Use: {', '.join(ACOES_FATO)}.")
@@ -457,9 +455,7 @@ def decisao(
     acao = (acao or "registrar").strip().lower()
     citacao_usuario = " ".join(str(citacao_usuario or "").split())
     if acao in ("aceitar", "rejeitar"):
-        nota = cofre.resolver_ref(ident)
-        if not nota or nota.tipo != "decisao":
-            raise ErroCofre(f"Decisão '{ident}' não encontrada.")
+        nota = cofre.exigir(ident, "decisao", "Decisão")
         if not autor.humano and not citacao_usuario:
             raise ErroCofre(f"Para {acao} uma decisão, passe 'citacao_usuario' com as palavras do usuário.")
         meta = dict(nota.meta)
@@ -797,9 +793,7 @@ def missao_criar(cofre: Cofre, autor: Autor, titulo: str, objetivo: str, criteri
 
 def missao_atualizar(cofre: Cofre, autor: Autor, ref: str, concluir_passo=None, adicionar_passo: str | None = None,
                      status: str | None = None, nota_log: str | None = None) -> Resultado:
-    alvo = cofre.resolver_ref(ref)
-    if not alvo or alvo.tipo != "missao":
-        raise ErroCofre(f"Missão '{ref}' não encontrada.")
+    alvo = cofre.exigir(ref, "missao", "Missão")
     ep.barrar_segredos(adicionar_passo or "", nota_log or "")
     with cofre.trava():
         nota = ler_nota(alvo.caminho)

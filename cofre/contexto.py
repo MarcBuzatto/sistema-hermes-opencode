@@ -272,7 +272,7 @@ def _por_caminho(cofre: Cofre, ref: str) -> Nota | None:
 def ler(cofre: Cofre, ref: str) -> str:
     nota = cofre.resolver_ref(ref) or cofre.projeto(ref) or _por_caminho(cofre, ref)
     if not nota:
-        return f"Nota '{ref}' não encontrada. Use cofre_buscar."
+        return f"Nota '{ref}' não encontrada.{cofre.sugestoes(ref)} Use cofre_buscar."
     aviso = ""
     if nota.tipo == "fato":
         aviso = {

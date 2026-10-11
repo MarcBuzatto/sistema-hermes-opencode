@@ -159,9 +159,10 @@ FERRAMENTAS: list[dict[str, Any]] = [
     {
         "name": "cofre_registrar_fato",
         "description": (
-            "Registra UMA afirmação atômica sobre o projeto/ambiente. Sem evidência = 'hipotese'. 'verificado' só com "
-            "evidência conferível (trecho copiado exatamente do arquivo/saída). Evidência de arquivo é conferida no disco; "
-            "trecho inventado é rejeitado. Afirmações já refutadas são rejeitadas."
+            "Registra UMA afirmação curta sobre o projeto/ambiente. Sem prova: status 'hipotese'. 'verificado' só com "
+            "evidência copiada EXATAMENTE do arquivo ou da saída do comando (o cofre confere no disco). "
+            "Exemplo: {\"afirmacao\": \"O banco é PostgreSQL 16\", \"status\": \"verificado\", \"evidencias\": "
+            "[{\"tipo\": \"arquivo\", \"ref\": \"/home/u/app/docker-compose.yml:3\", \"trecho\": \"image: postgres:16\"}]}"
         ),
         "inputSchema": _objeto({
             "afirmacao": {"type": "string", "description": "Uma frase verificável, ex.: 'O banco de produção é PostgreSQL 16'."},
@@ -180,9 +181,11 @@ FERRAMENTAS: list[dict[str, Any]] = [
     {
         "name": "cofre_atualizar_fato",
         "description": (
-            "Muda o status de um fato. promover (hipótese->verificado, exige evidência); contestar (há conflito, exige motivo); "
-            "refutar (é falso, exige motivo + evidência; passe afirmacao_correta para registrar a versão certa); "
-            "tornar_obsoleto (mudou); adicionar_evidencia. Use quando o usuário corrigir algo ou o código contradisser o cofre."
+            "Muda o status de um fato existente (use o ID F-XXXXX). Usuário corrigiu algo? acao='refutar' com motivo, "
+            "evidência do tipo usuario e afirmacao_correta. Outras ações: promover, contestar, tornar_obsoleto, adicionar_evidencia. "
+            "Exemplo: {\"id\": \"F-7K3PQ\", \"acao\": \"refutar\", \"motivo\": \"Usuário corrigiu\", \"evidencias\": "
+            "[{\"tipo\": \"usuario\", \"ref\": \"conversa\", \"trecho\": \"não é JWT, é sessão\"}], "
+            "\"afirmacao_correta\": \"A API usa sessão com cookie\"}"
         ),
         "inputSchema": _objeto({
             "id": {"type": "string"},
@@ -222,8 +225,9 @@ FERRAMENTAS: list[dict[str, Any]] = [
     {
         "name": "cofre_checkpoint",
         "description": (
-            "Salva o progresso: atualiza o Estado do projeto (foco, próximos passos, bloqueios) e o diário da sessão. "
-            "Chame ao concluir uma etapa, antes de encerrar e sempre que a conversa ficar longa. Reutilize o sessao_id devolvido."
+            "Salva o progresso (Estado do projeto + diário da sessão). Chame ao concluir uma etapa, antes de encerrar e quando "
+            "a conversa ficar longa. Exemplo: {\"resumo\": \"Login pronto\", \"feito\": [\"tela de login\"], "
+            "\"proximos_passos\": [\"testes e2e\"], \"foco\": \"Autenticação\"}"
         ),
         "inputSchema": _objeto({
             "resumo": {"type": "string"},
@@ -286,5 +290,20 @@ FERRAMENTAS: list[dict[str, Any]] = [
 POR_NOME = {f["name"]: f for f in FERRAMENTAS}
 
 
+EXEMPLOS = {
+    "cofre_registrar_fato": '{"afirmacao": "O banco é PostgreSQL 16", "status": "hipotese"}',
+    "cofre_atualizar_fato": '{"id": "F-7K3PQ", "acao": "contestar", "motivo": "o docker-compose mostra outra versão"}',
+    "cofre_buscar": '{"consulta": "autenticação jwt"}',
+    "cofre_ler": '{"id": "F-7K3PQ"}',
+    "cofre_checkpoint": '{"resumo": "Login pronto", "proximos_passos": ["testes e2e"]}',
+    "cofre_capturar": '{"texto": "cliente comentou que quer PIX no checkout"}',
+    "cofre_decisao": '{"titulo": "Usar Drizzle", "decisao": "Drizzle em vez de Prisma"}',
+    "cofre_projeto": '{"acao": "listar"}',
+    "cofre_missao": '{"acao": "listar"}',
+}
+for _f in FERRAMENTAS:
+    _f["exemplo"] = EXEMPLOS.get(_f["name"])
+
+
 def descricoes_mcp() -> list[dict]:
-    return [{k: v for k, v in f.items() if k != "handler"} for f in FERRAMENTAS]
+    return [{k: v for k, v in f.items() if k not in ("handler", "exemplo")} for f in FERRAMENTAS]
