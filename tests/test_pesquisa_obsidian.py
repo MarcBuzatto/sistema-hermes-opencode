@@ -173,7 +173,19 @@ class TestPesquisaObsidian(CofreTeste):
             cofre_main(["privado", "--json"])
         dados = json.loads(saida.getvalue())
         self.assertEqual(dados["relativas"], ["99-Privado"])
-        self.assertTrue(dados["absolutas"][0].endswith("99-Privado"))
+        self.assertIn(os.path.join(os.path.abspath(self.vault), "99-Privado"), dados["absolutas"])
+        self.assertIn(str((self.vault / "99-Privado").resolve()), dados["absolutas"])
+
+    @unittest.skipIf(os.name == "nt", "symlink exige privilégio no Windows")
+    def test_cli_privado_inclui_caminho_pelo_symlink(self):
+        atalho = self.tmp / "atalho-vault"
+        atalho.symlink_to(self.vault, target_is_directory=True)
+        os.environ["COFRE_VAULT"] = str(atalho)
+        with redirect_stdout(io.StringIO()) as saida:
+            cofre_main(["privado", "--json"])
+        dados = json.loads(saida.getvalue())
+        self.assertIn(str(atalho / "99-Privado"), dados["absolutas"])
+        self.assertIn(str((self.vault / "99-Privado").resolve()), dados["absolutas"])
 
     # ---- 8 e 9: revisão de notas soltas --------------------------------------------
     def test_revisar_orfas_moc_sugerido_e_nota_longa(self):

@@ -11,7 +11,9 @@ from pathlib import Path
 
 from . import __version__, contexto, notebooklm, registrar, specs
 from . import skills as skills_mod
-from .config import ErroCofre, arquivo_config_usuario, gravar_config_usuario, ler_config_usuario, resolver_vault
+from .config import (
+    ErroCofre, arquivo_config_usuario, gravar_config_usuario, ler_config_usuario, resolver_vault, vault_configurado,
+)
 from .registrar import Autor
 from .revisar import relatorio, revisar, salvar_relatorio
 from .vault import Cofre
@@ -326,8 +328,10 @@ def _completar_gitignore(alvo: Path, modelo: Path) -> int:
 
 def cmd_privado(a):
     cofre = _cofre(a)
-    pastas = [str((cofre.raiz / p).resolve()) for p in cofre.pastas_privadas()]
-    _imprimir(json.dumps({"vault": str(cofre.raiz.resolve()), "absolutas": pastas, "relativas": cofre.pastas_privadas()},
+    # Caminho como configurado e resolvido: symlink, /var -> /private/var no macOS, nome curto 8.3 no Windows.
+    raizes = list(dict.fromkeys([str(vault_configurado(a.vault)), str(cofre.raiz.resolve())]))
+    pastas = list(dict.fromkeys(os.path.join(r, *p.split("/")) for r in raizes for p in cofre.pastas_privadas()))
+    _imprimir(json.dumps({"vaults": raizes, "absolutas": pastas, "relativas": cofre.pastas_privadas()},
                          ensure_ascii=False) if a.json else "\n".join(pastas))
 
 

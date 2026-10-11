@@ -62,12 +62,13 @@ async function carregarPrivado(dir) {
     const casa = normal(homedir())
     const til = (p) => (casa && p.startsWith(casa + "/") ? "~" + p.slice(casa.length) : p)
     const absolutas = (d.absolutas ?? []).map(normal).filter(Boolean)
-    const vault = normal(d.vault ?? "")
+    const vaults = (d.vaults ?? []).map(normal).filter(Boolean)
+    const aqui = normal(dir ?? "") + "/"
     return {
       absolutas: [...new Set([...absolutas, ...absolutas.map(til)])],
       relativas: (d.relativas ?? []).map(normal).filter(Boolean),
-      vault: vault ? [...new Set([vault, til(vault)])] : [],
-      naVault: Boolean(vault) && (normal(dir ?? "") + "/").startsWith(vault + "/"),
+      vault: [...new Set([...vaults, ...vaults.map(til)])],
+      naVault: vaults.some((v) => aqui.startsWith(v + "/")),
     }
   } catch {
     return null

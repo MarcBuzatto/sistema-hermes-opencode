@@ -69,8 +69,8 @@ def gravar_config_usuario(dados: dict) -> Path:
     return destino
 
 
-def resolver_vault(explicito: str | None = None) -> Path:
-    """Ordem: argumento > COFRE_VAULT > config do usuário."""
+def vault_configurado(explicito: str | None = None) -> Path:
+    """Caminho do vault como foi configurado (sem resolver symlinks). Ordem: argumento > COFRE_VAULT > config do usuário."""
     for origem, valor in (
         ("argumento", explicito),
         ("COFRE_VAULT", os.environ.get("COFRE_VAULT")),
@@ -78,10 +78,14 @@ def resolver_vault(explicito: str | None = None) -> Path:
     ):
         if not valor:
             continue
-        caminho = Path(os.path.expanduser(str(valor)))
+        caminho = Path(os.path.abspath(os.path.expanduser(str(valor))))
         if caminho.is_dir():
-            return caminho.resolve()
+            return caminho
         raise ErroCofre(f"Vault do cofre não encontrado em {caminho} (definido por {origem}).")
     raise ErroCofre(
         "Vault do cofre não configurado. Rode scripts/instalar.py ou defina a variável COFRE_VAULT."
     )
+
+
+def resolver_vault(explicito: str | None = None) -> Path:
+    return vault_configurado(explicito).resolve()
