@@ -28,6 +28,16 @@ def normalizar_caminho(caminho: str) -> str:
     return s
 
 
+def _formas(caminho: str) -> set[str]:
+    """Como foi escrito e resolvido (symlink; /var -> /private/var no macOS): o diretório da sessão
+    pode chegar em qualquer uma das formas."""
+    expandido = os.path.expanduser(str(caminho).strip())
+    formas = {normalizar_caminho(expandido)}
+    if os.path.isabs(expandido) and os.path.exists(expandido):
+        formas.add(normalizar_caminho(os.path.realpath(expandido)))
+    return formas
+
+
 def dentro_de(alvo: str, base: str) -> bool:
     if alvo == base:
         return True
@@ -65,13 +75,13 @@ def resolver_projeto(cofre: Cofre, cwd: str | None = None, explicito: str | None
         return cofre.projeto(ref)
     if not cwd:
         return None
-    alvo = normalizar_caminho(os.path.abspath(cwd))
+    alvos = _formas(os.path.abspath(cwd))
     melhor, tamanho = None, -1
     for nota in cofre.projetos().values():
         for caminho in lista(nota.meta.get("caminhos")):
-            base = normalizar_caminho(caminho)
-            if dentro_de(alvo, base) and len(base) > tamanho:
-                melhor, tamanho = nota, len(base)
+            for base in _formas(caminho):
+                if any(dentro_de(alvo, base) for alvo in alvos) and len(base) > tamanho:
+                    melhor, tamanho = nota, len(base)
     if melhor:
         return melhor
     remoto = remoto_git(cwd)

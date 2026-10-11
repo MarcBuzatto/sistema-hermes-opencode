@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from base import CofreTeste
@@ -29,6 +30,20 @@ class TestResolucao(CofreTeste):
         sub.mkdir(parents=True)
         self.assertEqual(resolver_projeto(self.cofre, str(sub)).nome, "loja")
         self.assertIsNone(resolver_projeto(self.cofre, str(self.tmp)))
+
+    @unittest.skipIf(os.name == "nt", "symlink exige privilégio no Windows")
+    def test_projeto_aberto_por_symlink(self):
+        # macOS: o projeto é vinculado como /var/... e o os.getcwd() devolve /private/var/...;
+        # o mesmo vale para qualquer symlink.
+        from cofre.registrar import projeto_criar
+        real = self.tmp / "real" / "alfa"
+        (real / "src").mkdir(parents=True)
+        atalho = self.tmp / "atalho-alfa"
+        atalho.symlink_to(real, target_is_directory=True)
+        projeto_criar(self.cofre, self.humano, "alfa", caminhos=[str(atalho)])
+        self.cofre.invalidar()
+        self.assertEqual(resolver_projeto(self.cofre, str(real.resolve() / "src")).nome, "alfa")
+        self.assertEqual(resolver_projeto(self.cofre, str(atalho / "src")).nome, "alfa")
 
     def test_caminho_mais_especifico_vence(self):
         from cofre.registrar import projeto_criar
