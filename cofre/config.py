@@ -27,6 +27,9 @@ PADROES_VAULT = {
     "relevancia_ativa": True,
     "relevancia_max_itens": 5,
     "relevancia_max_chars": 1600,
+    # Um ponteiro de relevância não repete nos próximos N turnos; reaparece depois (troca de modelo,
+    # compactação, modelo fraco que esqueceu). 0 = sempre repetir.
+    "relevancia_repete_turnos": 6,
     # Specs: tempo máximo de cada comando de verificação (s) e comandos extras que o cofre pode
     # rodar além dos de teste/lint/build conhecidos (prefixos exatos, ex.: "docker compose run --rm api pytest").
     "verificacao_timeout": 300,

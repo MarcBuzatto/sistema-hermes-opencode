@@ -125,6 +125,12 @@ def _missao(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
     return "acao deve ser 'listar', 'criar' ou 'atualizar'."
 
 
+def _recurso(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
+    return registrar.recurso(cofre, autor, a.get("titulo", ""), url=a.get("url", ""),
+                             quando_usar=a.get("quando_usar", ""), descricao=a.get("descricao", ""),
+                             projeto=a.get("projeto"), tags=a.get("tags"), cwd=a.get("cwd") or cwd).texto()
+
+
 def _spec(cofre: Cofre, autor: Autor, a: dict, cwd: str) -> str:
     acao = (a.get("acao") or "ver").lower()
     cwd = a.get("cwd") or cwd
@@ -324,6 +330,24 @@ FERRAMENTAS: list[dict[str, Any]] = [
         "handler": _missao,
     },
     {
+        "name": "cofre_recurso",
+        "description": (
+            "Guarda um site, API ou ferramenta externa que o usuário usa e que você deve abrir/usar quando o assunto "
+            "aparecer (ex.: o usuário diz 'guarda esse site'). Não é fato nem evidência. 'quando_usar' diz em que "
+            "situação abrir. Depois, a busca por relevância mostra o recurso sozinha quando o tema voltar."
+        ),
+        "inputSchema": _objeto({
+            "titulo": {"type": "string", "description": "Nome do site/ferramenta."},
+            "url": {"type": "string", "description": "Link (https://...) ou comando de instalação/uso."},
+            "quando_usar": {"type": "string", "description": "Em que situação a IA deve abrir/usar isto."},
+            "descricao": {"type": "string", "description": "O que é / o que dá para fazer, em 1-2 frases."},
+            "tags": _LISTA,
+            "projeto": _PROJETO,
+            "cwd": _CWD,
+        }, ["titulo"]),
+        "handler": _recurso,
+    },
+    {
         "name": "cofre_spec",
         "description": (
             "Spec (o que construir, antes de codar). criar: titulo, objetivo, requisitos ('QUANDO <situação>, O SISTEMA "
@@ -383,6 +407,7 @@ EXEMPLOS = {
     "cofre_decisao": '{"titulo": "Usar Drizzle", "decisao": "Drizzle em vez de Prisma"}',
     "cofre_projeto": '{"acao": "listar"}',
     "cofre_missao": '{"acao": "listar"}',
+    "cofre_recurso": '{"titulo": "Shodan", "url": "https://www.shodan.io", "quando_usar": "reconhecimento de serviços expostos em pentest/OSINT"}',
     "cofre_spec": ('{"acao": "criar", "titulo": "Login com e-mail", "objetivo": "Usuário entra com e-mail e senha", '
                    '"requisitos": ["QUANDO a senha estiver errada, O SISTEMA DEVE mostrar Credenciais inválidas"], '
                    '"tarefas": [{"descricao": "Validar credenciais na rota /login", "cobre": ["R1"], '

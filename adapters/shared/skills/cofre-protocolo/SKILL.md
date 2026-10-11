@@ -67,6 +67,9 @@ Pedido com várias etapas ou arquivos: siga a skill `cofre-sdd`. Em resumo: `cof
 ## 10. Instruções do usuário por assunto
 Linha "instrução sua: ..." no bloco de relevância = regra que o usuário escreveu para aquele assunto (veio do AGENTS.md dele). Se a tarefa envolve o assunto, leia com `cofre_ler` e siga.
 
+## 11. Recursos (sites, APIs, ferramentas)
+Linha "recurso: ... [abra: ...]" no bloco de relevância = site/API/ferramenta que o usuário guardou para esse tipo de trabalho. Se servir à tarefa, use: abra o link, use a API (ou o navegador, se não houver API) ou rode o comando — com a permissão normal do seu ambiente. Quando o usuário apontar um site/ferramenta nova que vale guardar ("guarda esse site"), use `cofre_recurso` (titulo, url, quando_usar).
+
 # Referência rápida
 
 ## Status de um fato

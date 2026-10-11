@@ -42,7 +42,7 @@ class TestMCP(CofreTeste):
         self.assertIn(por_id[1]["result"]["protocolVersion"], ("2025-06-18",))
         self.assertTrue(any(m.get("method") == "roots/list" for m in respostas))
         nomes = [t["name"] for t in por_id[2]["result"]["tools"]]
-        self.assertEqual(len(nomes), 12)
+        self.assertEqual(len(nomes), 13)
         self.assertFalse(por_id[3]["result"]["isError"], por_id[3])
         self.assertIn("projeto loja", por_id[3]["result"]["content"][0]["text"])
         self.assertTrue(por_id[4]["result"]["isError"])

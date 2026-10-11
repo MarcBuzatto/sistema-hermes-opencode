@@ -130,6 +130,11 @@ def cmd_capturar(a):
                                  cwd=os.getcwd()).texto())
 
 
+def cmd_recurso(a):
+    _imprimir(registrar.recurso(_cofre(a), _autor(a), a.titulo, url=a.url or "", quando_usar=a.quando or "",
+                                descricao=a.descricao or "", projeto=a.projeto, tags=a.tag, cwd=os.getcwd()).texto())
+
+
 def cmd_projeto(a):
     cofre = _cofre(a)
     if a.acao == "listar":
@@ -447,6 +452,14 @@ def criar_parser() -> argparse.ArgumentParser:
     sp = novo("capturar", cmd_capturar, "Joga texto na inbox", autor=True)
     sp.add_argument("texto")
     sp.add_argument("--titulo")
+    sp.add_argument("--projeto")
+
+    sp = novo("recurso", cmd_recurso, "Guarda um site/API/ferramenta externa que a IA deve usar quando o assunto surgir", autor=True)
+    sp.add_argument("titulo", help="Nome do site/ferramenta")
+    sp.add_argument("--url", help="Link (https://...) ou comando de instalação/uso")
+    sp.add_argument("--quando", help="Em que situação a IA deve abrir/usar isto")
+    sp.add_argument("--descricao")
+    sp.add_argument("--tag", action="append")
     sp.add_argument("--projeto")
 
     sp = novo("projeto", cmd_projeto, "Projetos: listar | criar | vincular", autor=True)

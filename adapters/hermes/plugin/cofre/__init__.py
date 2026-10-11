@@ -61,16 +61,22 @@ def _texto_mensagem(mensagem):
     return ""
 
 
-def _relevante(session_id, texto):
+def _relevante(session_id, texto, turno):
+    """Janela deslizante: um ponteiro não repete nos próximos N turnos (economia), mas reaparece
+    depois disso — cobre a troca de modelo na mesma conversa e a compactação, em que o modelo
+    perde o que já tinha lido. O que precisa ser lembrado de verdade vira fato (prompt de sistema)."""
     try:
         _garantir_path()
         from cofre import contexto, relevancia
 
         cofre = _cofre()
         proj = contexto.resolver_projeto(cofre, _cwd_sessao.get(session_id) or os.getcwd())
-        vistos = _vistos.setdefault(session_id, set())
-        bloco, ids = relevancia.relevante(cofre, texto, projeto=proj.nome if proj else None, excluir=vistos)
-        vistos.update(ids)
+        janela = _config("relevancia_repete_turnos", 6)
+        vistos = _vistos.setdefault(session_id, {})
+        recentes = {k for k, t in vistos.items() if turno - t < janela}
+        bloco, ids = relevancia.relevante(cofre, texto, projeto=proj.nome if proj else None, excluir=recentes)
+        for k in ids:
+            vistos[k] = turno
         return bloco
     except Exception as e:
         log.warning("cofre: relevância indisponível: %s", e)
@@ -115,7 +121,7 @@ def register(ctx):
         n = _turnos.get(session_id, 0) + 1
         _turnos[session_id] = n
         partes = []
-        bloco = _relevante(session_id, _texto_mensagem(user_message))
+        bloco = _relevante(session_id, _texto_mensagem(user_message), n)
         if bloco:
             partes.append(bloco)
         cwd = _cwd_sessao.get(session_id) or os.getcwd()

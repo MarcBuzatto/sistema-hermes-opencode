@@ -38,7 +38,7 @@ STATUS_MISSAO = ("ativa", "pausada", "concluida", "cancelada")
 STATUS_SPEC = ("rascunho", "aprovada", "em_execucao", "concluida", "cancelada")
 TIPOS = (
     "fato", "decisao", "sessao", "estado", "projeto", "missao",
-    "captura", "cliente", "fonte", "perfil", "config", "spec", "instrucao",
+    "captura", "cliente", "fonte", "perfil", "config", "spec", "instrucao", "recurso",
 )
 PREFIXOS = {"fato": "F", "decisao": "D", "sessao": "S", "missao": "M", "captura": "C", "fonte": "N", "spec": "E"}
 _ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"

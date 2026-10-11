@@ -69,3 +69,12 @@ views:
       - status
       - aprovada_em
       - atualizada
+  - type: table
+    name: Recursos
+    filters:
+      and:
+        - 'tipo == "recurso"'
+    order:
+      - titulo
+      - quando_usar
+      - url

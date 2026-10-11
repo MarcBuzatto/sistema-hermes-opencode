@@ -9,7 +9,7 @@
 | `02-Sessoes/` | Sessões sem projeto `S-XXXXX` | Agentes |
 | `10-Projetos/<slug>/` | `<slug>.md` (hub), `<slug> - Estado.md`, `Fatos/`, `Decisoes/`, `Sessoes/`, `Specs/` | Agentes (via MCP) e você |
 | `20-Missoes/` | Missões `M-XXXXX` | Agentes e você |
-| `30-Conhecimento/` | `Fatos/` e `Decisoes/` globais (máquina, ferramentas, conhecimento geral); `Instrucoes/` com as seções do seu AGENTS.md levadas para o vault | Agentes, você e `cofre agents-md` |
+| `30-Conhecimento/` | `Fatos/` e `Decisoes/` globais; `Instrucoes/` (seções do AGENTS.md levadas ao vault); `Recursos/` (sites/ferramentas externas) | Agentes e você |
 | `40-Clientes/` | Hub por cliente (modelo `Cliente`) | Você |
 | `50-Fontes/` | Material externo; `NotebookLM/` com respostas importadas `N-XXXXX` | Você e agentes |
 | `60-Skills/` | Skills no formato Agent Skills (`<categoria>/<skill>/SKILL.md`); `sistema/` tem as do cofre | Você, o instalador (`sistema/`) e o Hermes ao aprender skills (com sua aprovação) |
@@ -60,6 +60,9 @@ Um por projeto. `atualizado`, `atualizado_por`, `ultima_sessao`. Corpo: Foco atu
 ### Spec (`tipo: spec`)
 `id`, `titulo`, `status` (`rascunho`, `aprovada`, `em_execucao`, `concluida`, `cancelada`), `projeto`, `aprovada_em`, `citacao_usuario`, `hash_aprovado`. Corpo: Objetivo, Requisitos (`- R1: ...`), Fora de escopo, Perguntas em aberto (`- [ ] P1: ...`), Plano, Tarefas (``- [ ] T1: descrição · cobre: R1 · verificar: `comando` ``; `[/]` em andamento, `[x]` concluída, `[!]` bloqueada, `[-]` cancelada), Histórico. Edite pelas ferramentas ou pelo terminal; mudar requisitos ou tarefas à mão depois da aprovação pede nova aprovação. Detalhes em [08-specs-e-harness.md](08-specs-e-harness.md).
 
+### Recurso (`tipo: recurso`)
+Site, API ou ferramenta externa que a IA deve abrir/usar quando o assunto aparecer (não é fato nem evidência): `titulo`, `url` (link ou comando), `quando_usar`, `tags`, `projeto` (opcional). Ficam em `30-Conhecimento/Recursos/` (geral) ou `10-Projetos/<slug>/Recursos/` (do projeto). Crie pelo modelo `Recurso`, por `cofre recurso "<nome>" --url ... --quando "..."`, ou peça à IA ("guarda esse site"); a busca por relevância mostra o recurso sozinha e a IA abre o link só quando servir.
+
 ### Instrução (`tipo: instrucao`)
 Seção do seu AGENTS.md levada para o vault por `cofre agents-md dividir`: `titulo`, `origem`, `tags`, `aliases`. Aparece para a IA como "instrução sua" quando o assunto surge.
 
@@ -100,6 +103,7 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | `Decisoes.base` | Propostas aguardando você, Aceitas, Todas |
 | `Missoes.base` | Quadro (kanban por status), Tabela |
 | `Specs.base` | Quadro (kanban por status: rascunho, aprovada, em execução, concluída), Tabela |
+| `Recursos.base` | Sites, APIs e ferramentas externas (título, quando usar, url) |
 | `Sessoes.base` | Recentes (14 dias), Todas |
 | `Inbox.base` | Capturas pendentes |
 | `Skills.base` | Skills em `60-Skills` (nome, quando usar, pasta) |

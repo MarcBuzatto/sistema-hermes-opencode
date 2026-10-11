@@ -35,7 +35,7 @@ flowchart TB
             K["60-Skills (skills)"]
         end
         Motor["Motor cofre (Python, sem dependências)<br/>validação epistêmica · contexto · revisão · NotebookLM"]
-        MCP["Servidor MCP 'cofre' (stdio)<br/>12 ferramentas"]
+        MCP["Servidor MCP 'cofre' (stdio)<br/>13 ferramentas"]
         CLI["CLI 'cofre'"]
         Motor --> Vault
         MCP --> Motor

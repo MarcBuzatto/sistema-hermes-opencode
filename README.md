@@ -29,7 +29,7 @@ Nada disso vai para o seu `AGENTS.md` (nem para o `SOUL.md` do Hermes): o protoc
 ```
 Obsidian (vault "Cofre")          <- você lê, edita e aprova
    ^            ^
-   |  MCP "cofre" (12 ferramentas com validação)
+   |  MCP "cofre" (13 ferramentas com validação)
    |            |
 Hermes        OpenCode            <- usam o ecossistema
 (plugin:      (plugin: contexto

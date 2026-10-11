@@ -33,7 +33,7 @@ from pathlib import Path
 from . import frontmatter
 from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista
 
-VERSAO_INDICE = 5
+VERSAO_INDICE = 6
 RADICAL = 6
 PESO_APROXIMADO = 0.8
 ARQUIVO_INDICE = Path(".cofre") / "indice.json"
@@ -186,7 +186,10 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
     titulo = str(meta.get("afirmacao") or meta.get("titulo") or meta.get("nome") or meta.get("name")
                  or titulo_h1 or caminho.stem)
     extras = [str(x) for x in lista(meta.get("tags")) + lista(meta.get("aliases"))]
-    extras += [str(meta.get(k)) for k in ("description", "id", "motivo") if meta.get(k)]
+    extras += [str(meta.get(k)) for k in ("description", "id", "motivo", "quando_usar") if meta.get(k)]
+    url = str(meta.get("url") or meta.get("link") or "")
+    if url:
+        extras.append(url)
     if tipo == "skill-ref":
         extras.append(caminho.stem)
     tf: Counter = Counter()
@@ -209,7 +212,8 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
         "projeto": alvo_link(meta.get("projeto")),
         "origem": str(meta.get("origem") or meta.get("confiabilidade") or ""),
         "skill": skill,
-        "resumo": " ".join(str(meta.get("description") or "").split())[:220] or _primeira_linha(corpo),
+        "url": url,
+        "resumo": " ".join(str(meta.get("quando_usar") or meta.get("description") or "").split())[:220] or _primeira_linha(corpo),
         "tf": dict(tf),
         "tx": sorted(tx),
         "w": sorted(inteiras),
@@ -277,8 +281,9 @@ class Achado:
 
 def _peso(doc: dict, projeto: str | None) -> float:
     tipo, status = doc.get("tipo"), doc.get("status")
-    peso = {"skill": 1.3, "instrucao": 1.3, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1, "fonte": 1.0, "nota": 1.0,
-            "missao": 0.9, "cliente": 1.0, "projeto": 0.9, "sessao": 0.6, "captura": 0.5}.get(tipo, 0.9)
+    peso = {"skill": 1.3, "instrucao": 1.3, "recurso": 1.2, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1,
+            "fonte": 1.0, "nota": 1.0, "missao": 0.9, "cliente": 1.0, "projeto": 0.9, "sessao": 0.6,
+            "captura": 0.5}.get(tipo, 0.9)
     if tipo == "fato":
         peso *= {"verificado": 1.15, "refutado": 1.15, "contestado": 1.0, "hipotese": 0.9, "obsoleto": 0.4}.get(status, 1)
     if tipo == "decisao" and status in ("substituida", "rejeitada"):
@@ -401,6 +406,10 @@ def linha(a: Achado) -> str:
         return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir)"
     if tipo == "instrucao":
         return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: cofre_ler \"{a.rel}\""
+    if tipo == "recurso":
+        onde = f" [abra: {d['url']}]" if d.get("url") else ""
+        quando = f" — {_curto(d['resumo'], 110)}" if d.get("resumo") and d["resumo"] != d["titulo"] else ""
+        return f"- recurso: {_curto(d['titulo'], 70)}{onde}{quando} — detalhes: cofre_ler \"{a.rel}\""
     if tipo == "skill-ref":
         return f"- referência da skill `{d.get('skill')}`: {_curto(d['titulo'], 80)} — cofre_ler \"{a.rel}\""
     if tipo == "fato":

@@ -15,6 +15,7 @@
 | Conversa ficou longa | `/checkpoint` (OpenCode) ou `/cofre-checkpoint` (Hermes) |
 | Vai trocar de assunto ou encerrar | Checkpoint antes |
 | Informação solta que não sabe onde encaixar | "joga na inbox do cofre" |
+| Um site/ferramenta que a IA deve usar nesse tipo de projeto | "guarda esse site" / `cofre recurso "Shodan" --url https://www.shodan.io --quando "reconhecimento"`. Depois ele surge sozinho quando o assunto voltar |
 | Feature ou mudança grande | OpenCode: `/spec <o que construir>` (ou Tab para o agente `spec`). Hermes: `/personality spec` e descreva. Responda as perguntas, revise requisitos e tarefas, diga "aprovado" |
 | Continuar uma spec | OpenCode: `/proxima`. Hermes: "continua a spec". A linha AGORA já diz à IA onde parou |
 | A IA diz que terminou | Só vale se `cofre_tarefa concluir` passou; veja a spec no Obsidian (aba Specs do projeto ou quadro no Início) |

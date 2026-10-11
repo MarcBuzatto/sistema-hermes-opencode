@@ -13,6 +13,7 @@ fatos_verificados_no_contexto: 15
 relevancia_ativa: true
 relevancia_max_itens: 5
 relevancia_max_chars: 1600
+relevancia_repete_turnos: 6
 verificacao_timeout: 300
 verificacao_comandos: []
 ---
@@ -35,5 +36,6 @@ Edite as propriedades acima pelo painel de propriedades do Obsidian. Elas valem 
 | `relevancia_ativa` | A cada mensagem sua, os plugins procuram no vault o que tem a ver com o assunto (notas, fatos, decisões, fontes, skills) e mostram à IA. `false` desliga. |
 | `relevancia_max_itens` | Quantos itens relacionados entram por mensagem. |
 | `relevancia_max_chars` | Tamanho máximo desse bloco. |
+| `relevancia_repete_turnos` | No Hermes, um ponteiro de relevância não repete nos próximos N turnos; reaparece depois (útil ao trocar de LLM na mesma conversa ou após compactação). `0` repete sempre. |
 | `verificacao_timeout` | Specs: tempo máximo (segundos) de cada comando de verificação que o cofre roda ao concluir uma tarefa. |
 | `verificacao_comandos` | Specs: comandos extras que o cofre pode rodar como verificação, além dos de teste/lint/build conhecidos (npm test, pytest, go test, cargo test...). Prefixo exato, ex.: `docker compose run --rm api pytest`. O cofre nunca usa shell. |

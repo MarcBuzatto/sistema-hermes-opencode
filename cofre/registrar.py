@@ -655,6 +655,49 @@ def checkpoint(
 
 
 # ---- captura (inbox) ------------------------------------------------------
+_URL = re.compile(r"^(https?://|www\.)", re.I)
+
+
+def recurso(cofre: Cofre, autor: Autor, titulo: str, url: str = "", quando_usar: str = "",
+            descricao: str = "", projeto: str | None = None, tags=None, cwd: str | None = None) -> Resultado:
+    """Site, API ou ferramenta externa que a IA deve conhecer e abrir quando o assunto aparecer.
+    Não é fato nem evidência: é um ponteiro para algo fora do cofre."""
+    titulo = " ".join(str(titulo or "").split())[:120]
+    url = str(url or "").strip()
+    quando_usar = " ".join(str(quando_usar or "").split())
+    if len(titulo) < 3:
+        raise ErroCofre("Recurso precisa de 'titulo' (nome do site/ferramenta).")
+    if url and not _URL.match(url) and "/" not in url and "." not in url:
+        raise ErroCofre(f"'{url}' não parece um link ou comando. Passe a URL (https://...) ou o comando de instalação.")
+    ep.barrar_segredos(titulo, url, quando_usar, descricao)
+    proj = _projeto_alvo(cofre, projeto, cwd)
+    with cofre.trava():
+        meta = _limpar({
+            "tipo": "recurso", "titulo": titulo, "url": url, "quando_usar": quando_usar,
+            "projeto": link(proj.nome) if proj else None, "tags": _itens(tags),
+            "registrado_por": autor.assinatura, "criado": hoje(),
+        })
+        corpo = juntar_secoes([
+            (None, f"# {titulo}"),
+            ("Quando usar", quando_usar or "(descreva em que situação a IA deve abrir isto)"),
+            ("O que é", descricao.strip()),
+            ("Link", url),
+        ])
+        pasta = (cofre.pasta_projeto(proj.nome) / "Recursos") if proj else (cofre.raiz / PASTAS["conhecimento"] / "Recursos")
+        caminho = pasta / f"{slug(titulo, 60)}.md"
+        if caminho.exists():
+            nota = ler_nota(caminho)
+            nota.meta.update({k: v for k, v in meta.items() if v})
+            nota.corpo = corpo
+            cofre.salvar(nota)
+            acao = "atualizado"
+        else:
+            cofre.salvar(Nota(caminho, meta, corpo))
+            acao = "registrado"
+    _commit(cofre, [caminho], f"cofre: recurso {acao} por {autor.assinatura}")
+    return Resultado(f"Recurso {acao}: {titulo}" + (f" ({url})" if url else ""), None, caminho)
+
+
 def capturar(cofre: Cofre, autor: Autor, texto: str, titulo: str | None = None,
              projeto: str | None = None, cwd: str | None = None) -> Resultado:
     texto = str(texto or "").strip()

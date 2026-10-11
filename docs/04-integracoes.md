@@ -34,7 +34,7 @@ Linux/macOS/WSL: `~/.hermes`; Windows nativo: `%LOCALAPPDATA%\hermes`; ou `HERME
 | Item | O que muda | Por quê |
 | --- | --- | --- |
 | `plugins/cofre/` | Plugin Python | Seção estável do prompt de sistema com o contexto do projeto e as regras (preservada na compactação); a cada mensagem, bloco com o que o vault tem sobre o assunto (sem repetir itens já mostrados na sessão), a linha AGORA da spec ativa (sem spec, âncora com o foco a cada N turnos) e lembrete depois de N mensagens sem checkpoint; aviso ao fechar sessão longa sem checkpoint |
-| `mcp_servers.cofre` | Servidor MCP stdio, `timeout: 1200` | As 12 ferramentas `cofre_*`. O timeout cobre a verificação de tarefas de spec (padrão do Hermes: 300 s) |
+| `mcp_servers.cofre` | Servidor MCP stdio, `timeout: 1200` | As 13 ferramentas `cofre_*`. O timeout cobre a verificação de tarefas de spec (padrão do Hermes: 300 s) |
 | `agent.personalities.spec` | Personality `spec` | `/personality spec` liga o modo spec (SDD com verificação). Se você já tem uma personality com esse nome, ela é mantida |
 | `plugins.enabled` | `+ cofre` | Plugins do usuário são opt-in |
 | `skills.create_dir` | `<vault>/60-Skills` | O Hermes lê as skills do vault e cria as que aprender lá. Se você já usa `create_dir` para outra pasta, o instalador mantém e adiciona o vault em `skills.external_dirs` |
@@ -99,6 +99,7 @@ O motor trata `C:/Users/voce/dev/loja` e `/mnt/c/Users/voce/dev/loja` como o mes
 | `cofre_capturar` | Inbox |
 | `cofre_projeto` | listar, criar, vincular |
 | `cofre_missao` | listar, criar, atualizar |
+| `cofre_recurso` | Guarda site/API/ferramenta externa (url, quando_usar); surge por relevância quando o assunto volta |
 | `cofre_spec` | criar, ver, listar, adicionar, responder, aprovar, cancelar ([specs](08-specs-e-harness.md)) |
 | `cofre_tarefa` | proxima, iniciar, concluir (roda a verificação), bloquear, reabrir, regressao |
 

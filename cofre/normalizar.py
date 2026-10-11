@@ -31,6 +31,7 @@ ALIASES_CHAVE = {
     "decision": "decisao", "alternatives": "alternativas", "consequences": "consequencias",
     "user_quote": "citacao_usuario", "citacao": "citacao_usuario", "quote": "citacao_usuario",
     "text": "texto", "content": "conteudo", "section": "secao", "mode": "modo",
+    "link": "url", "site": "url", "endereco": "url", "when_to_use": "quando_usar", "usar_quando": "quando_usar",
     "path": "caminho", "repository": "repo", "client": "cliente", "description": "descricao",
     "criticality": "criticidade", "force": "forcar", "limit": "limite", "type": "tipo", "model": "agente",
     "working_directory": "cwd", "workdir": "cwd", "diretorio": "cwd",

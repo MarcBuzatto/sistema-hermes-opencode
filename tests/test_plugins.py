@@ -79,6 +79,39 @@ class TestPluginHermes(PluginTeste):
         saida = por_mensagem(session_id="s1", user_message="segue", conversation_history=historico)
         self.assertNotIn("mensagens do usuário sem checkpoint", (saida or {}).get("context", ""))
 
+    def test_memoria_entre_troca_de_modelos(self):
+        # janela curta para exercitar o reaparecimento rápido
+        cfg = self.vault / "00-Sistema" / "config.md"
+        cfg.write_text(cfg.read_text(encoding="utf-8").replace("relevancia_repete_turnos: 6", "relevancia_repete_turnos: 2"),
+                       encoding="utf-8")
+        self.spec_aprovada()
+        from cofre import registrar as r
+        r.registrar_fato(self.cofre, self.humano, "O deploy da loja é na Vercel", status="verificado",
+                         projeto="loja", evidencias=[{"tipo": "usuario", "ref": "conversa", "trecho": "deploy na vercel"}])
+        ctx = self.carregar()
+        secao = ctx.secoes["cofre.contexto"]
+        por_mensagem = ctx.hooks["pre_llm_call"]
+
+        # Modelo A monta o prompt de sistema: contexto do projeto + fato verificado + AGORA da spec.
+        s_a = secao({"cwd": str(self.proj), "session_id": "s3"})
+        self.assertIn("contexto do projeto: Loja", s_a)
+        m1 = por_mensagem(session_id="s3", user_message="o burp não intercepta https",
+                          conversation_history=[_usuario("x")])
+        self.assertIn("Burp Suite", m1["context"])
+        # Mesmo assunto no turno seguinte: não repete (economia).
+        m2 = por_mensagem(session_id="s3", user_message="e o burp?", conversation_history=[_usuario("x")] * 2)
+        self.assertNotIn("Burp Suite", (m2 or {}).get("context", ""))
+
+        # Troca de LLM na mesma sessão: o novo modelo chama a seção de sistema de novo e recebe
+        # o mesmo contexto durável (fato verificado + AGORA), sem depender do que o modelo A leu.
+        s_b = secao({"cwd": str(self.proj), "session_id": "s3"})
+        self.assertEqual(s_a, s_b)
+        self.assertIn("Vercel", s_b)  # fato verificado está no prompt de todo modelo que assumir a conversa
+
+        # Passada a janela (simula compactação/esquecimento), o ponteiro reaparece ("puxar de novo").
+        m3 = por_mensagem(session_id="s3", user_message="vamos voltar ao burp", conversation_history=[_usuario("x")] * 3)
+        self.assertIn("Burp Suite", m3["context"])
+
     def test_sem_spec_ancora_so_a_cada_n_turnos(self):
         ctx = self.carregar()
         ctx.secoes["cofre.contexto"]({"cwd": str(self.proj), "session_id": "s2"})
