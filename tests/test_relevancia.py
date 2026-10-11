@@ -52,7 +52,14 @@ class TestRelevancia(CofreTeste):
         nota = self.nota("30-Conhecimento/Frontend/Tailwind.md", "# Tailwind CSS\nAgora fala de kubernetes e helm.\n")
         futuro = time.time() + 5
         os.utime(nota, (futuro, futuro))
+        relevancia._MEMORIA.clear()  # edição externa: num processo aberto aparece em até MEMORIA_TTL s
         self.assertIn("Tailwind", relevancia.relevante(self.cofre, "deploy com kubernetes e helm")[0])
+
+    def test_escrita_do_proprio_processo_invalida_o_cache(self):
+        self.popular()
+        self.assertEqual(relevancia.relevante(self.cofre, "migração para kubernetes")[0], "")
+        r.registrar_fato(self.cofre, self.humano, "O cluster de produção roda em kubernetes 1.30", projeto="global")
+        self.assertIn("kubernetes", relevancia.relevante(self.cofre, "migração para kubernetes")[0])
 
     def test_ignora_sistema_modelos_e_exemplos(self):
         docs = relevancia.carregar_indice(self.vault)

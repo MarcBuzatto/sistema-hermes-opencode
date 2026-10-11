@@ -5,11 +5,17 @@ os plugins mandam o texto para cá e recebem de volta poucas linhas apontando as
 fatos, decisões, fontes e skills relacionadas, cada uma com o status.
 
 - Ranqueamento BM25 com pesos por campo (título > tags/aliases/description > corpo).
-- Tolerante a erro de digitação: radical de 5 letras ("penteast" e "pentest" viram
-  "pente") e, para termos que não existem no vault, distância de edição 1.
+- Radical: tira o plural e corta em RADICAL letras ("notificações" e "notificação" viram
+  "notifi"). Erro de digitação: palavra da mensagem que não existe no vault casa com
+  palavra inteira do título/tags/description a uma edição de distância ("penteast" ->
+  "pentest"). A comparação é entre palavras inteiras, não entre radicais, para "seguir"
+  não virar "segurança" nem "explica" virar "explain".
+- Com projeto atual definido, o nome dele sai da consulta: já está no contexto e casaria
+  com todos os fatos do projeto.
 - Indexa tudo que é nota do vault, inclusive notas livres sem `tipo` e as skills de
   `60-Skills` (SKILL.md e references/). Ignora 00-Sistema, modelos, exemplos e exportações.
-- Índice em cache em `<vault>/.cofre/indice.json`, atualizado só para arquivos alterados.
+- Índice em cache em `<vault>/.cofre/indice.json`, atualizado só para arquivos alterados,
+  e em memória nos processos que ficam abertos. Avaliação: tests/avaliacao_relevancia.py.
 """
 
 from __future__ import annotations
@@ -18,15 +24,18 @@ import json
 import math
 import os
 import re
+import time
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import frontmatter
-from .vault import DIR_EXPORTACOES, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista
+from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista
 
-VERSAO_INDICE = 4
+VERSAO_INDICE = 5
+RADICAL = 6
+PESO_APROXIMADO = 0.8
 ARQUIVO_INDICE = Path(".cofre") / "indice.json"
 PESO_CAMPO = {"t": 3, "x": 2, "b": 1}
 K1, B = 1.2, 0.75
@@ -41,20 +50,31 @@ lhe nosso nossa meu minha teu tua dele dela deles delas ser estar ter haver faze
 podemos quero queria preciso precisa vou vai vamos estou esta estamos estao era foi sao tem tinha temos algo alguma
 algum alguns coisa coisas tipo assim sobre entre ate desde sem sob apos cada todo toda todos todas outro outra
 qual quais quem falando falar fala falei conversa conversar pergunta perguntar ajuda ajudar bora olha veja
-acho achei sei saber sabe entao ok oi ola obrigado valeu certo beleza blz dai ai gente pessoal favor mim the is are was were be been of to in on at by for with from and or not this that these those it
+acho achei sei saber sabe entao ok oi ola obrigado valeu certo beleza blz dai ai gente pessoal favor mim
+projeto projetos cliente clientes escreve escrever escrevo escreva escrevendo explica explicar explique mostra mostrar
+mostre pede pedir pedindo manda mandar mande deixa deixar coloca colocar segue seguir continua continuar parou
+servindo servir falta faltando faltou usa usar uso usando use usam versao versoes version hoje ontem amanha depois antes nesse nessa neste nessa disso desse dessa daquele the is are was were be been of to in on at by for with from and or not this that these those it
 its as an if then than so do does did have has had can could should would will just about into over what which
 how why who when where you your we our they their i me my he she him her them us also very more most some any
 """.split())
 
 
-def termos(texto: str) -> list[str]:
+def radical(palavra: str) -> str:
+    if not palavra.isalpha():
+        return palavra
+    if len(palavra) > 4 and palavra.endswith("s") and not palavra.endswith("ss"):
+        palavra = palavra[:-1]
+    return palavra[:RADICAL]
+
+
+def palavras(texto: str) -> list[str]:
     normal = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().lower()
-    saida = []
-    for t in re.findall(r"[a-z0-9]+", normal):
-        if len(t) < 2 or t in _PARADAS or t.isdigit() and len(t) > 6:
-            continue
-        saida.append(t[:5] if t.isalpha() and len(t) > 5 else t)
-    return saida
+    return [t for t in re.findall(r"[a-z0-9]+", normal)
+            if len(t) >= 2 and t not in _PARADAS and not (t.isdigit() and len(t) > 6)]
+
+
+def termos(texto: str) -> list[str]:
+    return [radical(t) for t in palavras(texto)]
 
 
 def _distancia_ate_1(a: str, b: str) -> bool:
@@ -86,20 +106,29 @@ def _distancia_ate_1(a: str, b: str) -> bool:
 
 
 # ---- índice ----------------------------------------------------------------
-def _ignorar_dir(raiz: Path, pasta: Path, nome: str) -> bool:
-    if nome in IGNORAR_DIRS or nome.startswith("."):
-        return True
-    rel = (pasta / nome).relative_to(raiz).as_posix()
-    return rel in (PASTAS["sistema"], DIR_EXPORTACOES)
-
-
 def _arquivos(raiz: Path):
-    for pasta, dirs, arquivos in os.walk(raiz):
-        p = Path(pasta)
-        dirs[:] = [d for d in dirs if not _ignorar_dir(raiz, p, d)]
-        for nome in arquivos:
-            if nome.endswith(".md") and not nome.startswith(".") and nome != "LEIA-ME.md":
-                yield p / nome
+    """(caminho relativo posix, caminho absoluto, mtime) de cada nota indexável."""
+    fora = {PASTAS["sistema"], DIR_EXPORTACOES}
+    pilha = [("", str(raiz))]
+    while pilha:
+        prefixo, pasta = pilha.pop()
+        try:
+            entradas = list(os.scandir(pasta))
+        except OSError:
+            continue
+        for e in entradas:
+            nome = e.name
+            if nome.startswith("."):
+                continue
+            rel = prefixo + nome
+            try:
+                if e.is_dir():
+                    if nome not in IGNORAR_DIRS and rel not in fora:
+                        pilha.append((rel + "/", e.path))
+                elif nome.endswith(".md") and nome != "LEIA-ME.md":
+                    yield rel, e.path, e.stat().st_mtime
+            except OSError:
+                continue
 
 
 def _primeira_linha(corpo: str) -> str:
@@ -162,12 +191,15 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
         extras.append(caminho.stem)
     tf: Counter = Counter()
     tx = set()
+    inteiras = set()
     for campo, conteudo in (("t", titulo), ("x", " ".join(extras)), ("b", _corpo_util(corpo)[:MAX_CORPO])):
-        ts = termos(conteudo)
+        ps = palavras(conteudo)
+        ts = [radical(p) for p in ps]
         for t in ts:
             tf[t] += PESO_CAMPO[campo]
         if campo != "b":
             tx.update(ts)
+            inteiras.update(p for p in ps if p.isalpha() and radical(p) != p)
     return {
         "mtime": mtime,
         "tipo": tipo,
@@ -180,31 +212,38 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
         "resumo": " ".join(str(meta.get("description") or "").split())[:220] or _primeira_linha(corpo),
         "tf": dict(tf),
         "tx": sorted(tx),
+        "w": sorted(inteiras),
         "len": sum(tf.values()),
     }
 
 
+_MEMORIA: dict[str, tuple[float, int, dict, dict]] = {}
+MEMORIA_TTL = 5.0
+
+
 def carregar_indice(raiz: Path, salvar: bool = True) -> dict[str, dict]:
+    """Índice do vault. Em processos que ficam abertos (plugin do Hermes, servidor MCP), reaproveita
+    o índice em memória por MEMORIA_TTL segundos, ou até o próprio processo gravar no vault."""
     raiz = Path(raiz)
+    chave = str(raiz.resolve())
+    em_memoria = _MEMORIA.get(chave)
+    if em_memoria and em_memoria[1] == GERACAO[0] and time.monotonic() - em_memoria[0] < MEMORIA_TTL:
+        return em_memoria[2]
+    antigo: dict = em_memoria[3] if em_memoria else {}
     arq = raiz / ARQUIVO_INDICE
-    antigo: dict = {}
-    try:
-        dados = json.loads(arq.read_text(encoding="utf-8"))
-        if dados.get("versao") == VERSAO_INDICE:
-            antigo = dados.get("docs", {})
-    except (OSError, ValueError):
-        pass
+    if not antigo:
+        try:
+            dados = json.loads(arq.read_text(encoding="utf-8"))
+            if dados.get("versao") == VERSAO_INDICE:
+                antigo = dados.get("docs", {})
+        except (OSError, ValueError):
+            pass
     novo: dict[str, dict] = {}
     mudou = False
-    for caminho in _arquivos(raiz):
-        rel = caminho.relative_to(raiz).as_posix()
-        try:
-            mtime = caminho.stat().st_mtime
-        except OSError:
-            continue
+    for rel, caminho, mtime in _arquivos(raiz):
         doc = antigo.get(rel)
         if doc is None or doc.get("mtime") != mtime:
-            doc = _analisar(raiz, caminho, mtime)
+            doc = _analisar(raiz, Path(caminho), mtime)
             mudou = True
             if doc is None:
                 doc = {"mtime": mtime, "fora": True}
@@ -217,7 +256,9 @@ def carregar_indice(raiz: Path, salvar: bool = True) -> dict[str, dict]:
                                              separators=(",", ":")))
         except OSError:
             pass
-    return {k: v for k, v in novo.items() if not v.get("fora")}
+    validos = {k: v for k, v in novo.items() if not v.get("fora")}
+    _MEMORIA[chave] = (time.monotonic(), GERACAO[0], validos, novo)
+    return validos
 
 
 # ---- busca -------------------------------------------------------------------
@@ -226,6 +267,8 @@ class Achado:
     rel: str
     doc: dict
     pontos: float
+    termos: frozenset = frozenset()
+    no_titulo: frozenset = frozenset()
 
     @property
     def chave(self) -> str:
@@ -245,10 +288,21 @@ def _peso(doc: dict, projeto: str | None) -> float:
     return peso
 
 
+def _termos_do_projeto(cofre: Cofre, projeto: str | None) -> set[str]:
+    if not projeto:
+        return set()
+    nota = cofre.projeto(projeto)
+    nomes = [projeto] + ([str(nota.meta.get("nome") or ""), nota.nome] if nota else [])
+    return {t for n in nomes for t in termos(n)}
+
+
 def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5, excluir=(),
            tipos=None, status=None, so_fortes: bool = True) -> list[Achado]:
-    consulta = list(dict.fromkeys(termos(str(texto)[:4000])))
-    if not consulta:
+    originais = list(dict.fromkeys(palavras(str(texto)[:4000])))
+    do_projeto = _termos_do_projeto(cofre, projeto)
+    sem_projeto = [p for p in originais if radical(p) not in do_projeto]
+    originais = sem_projeto or originais
+    if not originais:
         return []
     docs = carregar_indice(cofre.raiz)
     if tipos:
@@ -262,14 +316,29 @@ def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5
     for d in docs.values():
         df.update(d["tf"].keys())
     vocab = set(df)
+    # Palavras inteiras do vault: as que o radical encurtou (guardadas em "w") e as que já são o
+    # próprio radical (chaves curtas de tf).
+    inteiras = {t for t in vocab if len(t) <= RADICAL and t.isalpha()}
+    for d in docs.values():
+        inteiras.update(d.get("w", ()))
     expandida: dict[str, list[str]] = {}
-    for q in consulta:
+    aproximados: set[str] = set()
+    for p in originais:
+        q = radical(p)
+        if q in expandida:
+            continue
         if q in vocab:
             expandida[q] = [q]
-        elif len(q) >= 4:
-            parecidos = [v for v in vocab if v[0] == q[0] and _distancia_ate_1(q, v)]
+        elif len(p) >= 5 and p.isalpha():
+            # Em palavras de 5 letras, só letra a mais ou a menos ("nexjs" -> "nextjs"); trocar
+            # uma letra transforma palavra real em outra palavra real ("falta" -> "falha").
+            parecidos = {radical(v) for v in inteiras
+                         if v[0] == p[0] and abs(len(v) - len(p)) <= 1 and (len(p) >= 6 or len(v) != len(p))
+                         and _distancia_ate_1(p, v)}
+            parecidos &= vocab
             if parecidos:
-                expandida[q] = parecidos
+                expandida[q] = sorted(parecidos)
+                aproximados.add(q)
     if not expandida:
         return []
     media = sum(d["len"] for d in docs.values()) / n or 1.0
@@ -279,8 +348,9 @@ def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5
         if rel in excluir or (d.get("id") and d["id"] in excluir):
             continue
         tf, tx = d["tf"], set(d.get("tx", ()))
-        pontos, forte, cobertos = 0.0, False, 0
-        for termos_doc in expandida.values():
+        pontos, forte = 0.0, False
+        cobertos, no_titulo = set(), set()
+        for q, termos_doc in expandida.items():
             melhor = 0.0
             for t in termos_doc:
                 f = tf.get(t)
@@ -288,19 +358,29 @@ def buscar(cofre: Cofre, texto: str, projeto: str | None = None, limite: int = 5
                     continue
                 idf = math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5))
                 melhor = max(melhor, idf * f * (K1 + 1) / (f + K1 * (1 - B + B * d["len"] / media)))
+                if t in tx:
+                    no_titulo.add(q)
                 if t in tx or (f >= 2 * PESO_CAMPO["b"] and (n < 4 or df[t] / n <= 0.5)):
                     forte = True
-            pontos += melhor
-            cobertos += melhor > 0
-        if cobertos >= 2:
+            pontos += melhor * (PESO_APROXIMADO if q in aproximados else 1.0)
+            if melhor > 0:
+                cobertos.add(q)
+        if len(cobertos) >= 2:
             forte = True
         if pontos <= 0 or (so_fortes and not forte):
             continue
-        achados.append(Achado(rel, d, pontos * _peso(d, projeto)))
+        achados.append(Achado(rel, d, pontos * _peso(d, projeto), frozenset(cobertos), frozenset(no_titulo)))
     achados.sort(key=lambda a: a.pontos, reverse=True)
     if achados and so_fortes:
+        # Corte relativo, mas quem traz um assunto da mensagem que nenhuma nota acima cobriu
+        # (casado no título/tags) fica: mensagens costumam falar de mais de uma coisa.
         corte = achados[0].pontos * 0.35
-        achados = [a for a in achados if a.pontos >= corte]
+        mantidos, vistos = [], set()
+        for a in achados:
+            if a.pontos >= corte or a.no_titulo - vistos:
+                mantidos.append(a)
+                vistos |= a.termos
+        achados = mantidos
     return achados[: max(1, int(limite))]
 
 

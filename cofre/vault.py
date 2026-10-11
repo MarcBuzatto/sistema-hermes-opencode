@@ -129,7 +129,12 @@ def ler_nota(caminho: Path) -> Nota:
     return Nota(caminho, meta, corpo)
 
 
+# Incrementado a cada escrita deste processo; caches em memória (índice de relevância) comparam.
+GERACAO = [0]
+
+
 def escrever_atomico(caminho: Path, texto: str) -> None:
+    GERACAO[0] += 1
     caminho.parent.mkdir(parents=True, exist_ok=True)
     tmp = caminho.with_name(f".{caminho.name}.{os.getpid()}.tmp")
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
