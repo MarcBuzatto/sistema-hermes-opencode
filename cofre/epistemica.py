@@ -231,7 +231,7 @@ def achar_segredos(texto: str, incluir_fracos: bool = False) -> list[str]:
 
 def barrar_segredos(*textos: str) -> None:
     for texto in textos:
-        achados = achar_segredos(texto or "")
+        achados = achar_segredos(texto or "", incluir_fracos=True)
         if achados:
             raise ErroCofre(
                 "Conteúdo bloqueado: parece conter credencial (" + ", ".join(achados) + "). "

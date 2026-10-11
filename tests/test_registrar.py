@@ -39,10 +39,17 @@ class TestFatos(CofreTeste):
                          motivo="Usuário corrigiu: autenticação é por sessão",
                          evidencias=[{"tipo": "usuario", "ref": "conversa", "trecho": "não é JWT, é sessão com cookie"}],
                          afirmacao_correta="A API autentica com sessão em cookie httpOnly")
-        with self.assertRaisesRegex(ErroCofre, "REFUTADA"):
-            r.registrar_fato(self.cofre, self.agente, "A API usa JWT para autenticar usuários")
+        # Reescritas pesadas também não devem passar (o modelo fraco reformula para escapar).
+        for parafrase in ("A API usa JWT para autenticar usuários",
+                          "A autenticação da API é feita por JWT",
+                          "Autenticação por JWT na API",
+                          "O login da API é via JWT"):
+            with self.assertRaisesRegex(ErroCofre, "REFUTADA"):
+                r.registrar_fato(self.cofre, self.agente, parafrase)
         with self.assertRaisesRegex(ErroCofre, "REFUTADA"):
             r.registrar_fato(self.cofre, self.agente, "A API usa JWT para autenticar usuários", forcar=True)
+        # Fato genuinamente diferente sobre a mesma API NÃO é barrado como refutado.
+        r.registrar_fato(self.cofre, self.agente, "A API tem rate limiting de cem requisições por minuto")
         antigo = self.cofre.por_id(res.id)
         self.assertEqual(antigo.status, "refutado")
         novo = self.cofre.resolver_ref(antigo.meta["substituido_por"])
@@ -84,6 +91,11 @@ class TestFatos(CofreTeste):
             r.registrar_fato(self.cofre, self.agente, "O token do GitHub é ghp_" + "a" * 36)
         with self.assertRaisesRegex(ErroCofre, "credencial"):
             r.capturar(self.cofre, self.agente, "conexão postgres://admin:s3nh4forte@db.local/loja")
+        # Segredo "fraco" (senha:/password=) também é barrado na escrita, não só na revisão.
+        with self.assertRaisesRegex(ErroCofre, "credencial"):
+            r.registrar_fato(self.cofre, self.agente, "Credencial do banco — senha: superSecreta123")
+        with self.assertRaisesRegex(ErroCofre, "credencial"):
+            r.capturar(self.cofre, self.agente, "anotação password=hunter2two no ambiente")
 
     def test_historico_preservado_ao_atualizar(self):
         res = r.registrar_fato(self.cofre, self.agente, "A fila de jobs usa BullMQ", contexto="Visto no README")

@@ -57,7 +57,10 @@ _TAREFA = re.compile(r"^- \[(.)\] (T\d+):\s*(.*)$")
 _REQUISITO = re.compile(r"^- (R\d+):\s*(.*)$")
 _PERGUNTA = re.compile(r"^- \[([ xX])\] (P\d+):\s*(.*)$")
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
-_SHELL = re.compile(r"[;&|<>`$\r\n]" + ("|[%^]" if os.name == "nt" else ""))
+# Metacaracteres de shell e caracteres de controle (tab, NUL etc.) e comentário. A verificação roda
+# com subprocess (lista de argumentos, sem shell), então isto é defesa em profundidade: um comando de
+# teste legítimo não tem nada disso, e o que tiver vira verificação manual.
+_SHELL = re.compile(r"[;&|<>`$#\t\x00-\x08\x0b\x0c\x0e-\x1f]" + ("|[%^\r\n]" if os.name == "nt" else r"|[\r\n]"))
 
 
 # ---- modelo ---------------------------------------------------------------------

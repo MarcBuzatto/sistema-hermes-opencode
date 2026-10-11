@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import random
 import unittest
 
 from base import CofreTeste
@@ -85,6 +86,29 @@ class TestRobustez(CofreTeste):
             erro, texto = self.chamar("cofre_buscar", lixo)
             self.assertTrue(erro)
             self.assertIn("consulta", texto)
+
+    def test_campo_string_recebendo_lista_ou_dict_nao_estoura(self):
+        # Modelo manda um dict/lista num campo que é string (acao): vira erro limpo, não AttributeError.
+        for valor in ({"a": 1}, [{"x": 1}], [{"x": 1}, {"y": 2}], 42):
+            erro, texto = self.chamar("cofre_missao", {"acao": valor})
+            self.assertNotIn("Erro interno", texto, f"{valor!r} -> {texto}")
+
+    def test_fuzz_nenhuma_ferramenta_estoura(self):
+        from cofre.ferramentas import POR_NOME
+        valores = [None, "", 0, 1.5, True, [], {}, [None], {"a": {"b": 1}}, [{"x": 1}],
+                   "x" * 5000, "../../etc/passwd", "F-7K3PQ", "a,b,c", "Verificado", 10**20,
+                   {"tipo": "arquivo", "ref": "x", "trecho": "y"}, "https://u:p@h/x"]
+        chaves = ["afirmacao", "status", "acao", "id", "consulta", "titulo", "objetivo", "evidencias",
+                  "tarefas", "url", "quando_usar", "spec", "tarefa", "texto", "projeto", "cwd"]
+        rnd = random.Random(7)
+        for nome in POR_NOME:
+            for _ in range(60):
+                args = {k: rnd.choice(valores) for k in rnd.sample(chaves, rnd.randint(0, 4))}
+                r = self.srv.chamar(nome, args)  # não pode lançar
+                self.assertIn("content", r)
+                self.assertIsInstance(r["content"][0]["text"], str)
+                self.assertNotIn("Erro interno do cofre: AttributeError", r["content"][0]["text"])
+        Cofre(self.vault).notas(recarregar=True)  # vault não corrompeu
 
 
 if __name__ == "__main__":

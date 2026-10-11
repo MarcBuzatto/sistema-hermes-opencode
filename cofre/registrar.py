@@ -27,7 +27,11 @@ from .vault import (
 )
 
 LIMIAR_SIMILAR = 0.6
-LIMIAR_REFUTADO = 0.7
+# Mais baixo que o de duplicata: reescrever uma afirmação REFUTADA é o pior caso (o modelo volta a
+# gravar o erro). Medido com paráfrases reais vs. fatos legítimos do mesmo assunto, o vão fica entre
+# ~0.36 (fato diferente) e ~0.54 (paráfrase); 0.5 pega a reescrita sem barrar fato distinto. O forcar
+# continua disponível abaixo de LIMIAR_IDENTICO para o caso raro de ser mesmo outra afirmação.
+LIMIAR_REFUTADO = 0.5
 LIMIAR_IDENTICO = 0.85
 
 CALLOUT_FATO = {

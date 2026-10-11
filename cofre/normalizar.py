@@ -70,6 +70,12 @@ _VERDADEIRO = {"true", "sim", "yes", "1", "verdadeiro", "s", "y"}
 _LISTA_POR_VIRGULA = {"tags", "stack", "status", "projetos", "fatos", "decisoes"}
 
 
+def _texto(valor) -> str:
+    if isinstance(valor, (dict, list, tuple)):
+        return json.dumps(valor, ensure_ascii=False)
+    return str(valor)
+
+
 def chave(texto: str) -> str:
     s = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().strip().lower()
     return re.sub(r"[\s\-]+", "_", s)
@@ -149,8 +155,8 @@ def normalizar(args, schema: dict) -> dict:
                 v = [_valor_enum(x, itens["enum"]) for x in v]
         elif tipo == "string":
             if isinstance(v, (list, tuple)):
-                v = v[0] if len(v) == 1 else "\n".join(str(x) for x in v)
-            elif isinstance(v, dict):
+                v = v[0] if len(v) == 1 else "\n".join(_texto(x) for x in v)
+            if isinstance(v, dict):
                 v = json.dumps(v, ensure_ascii=False)
             elif v is not None and not isinstance(v, str):
                 v = str(v)
