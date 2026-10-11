@@ -2,7 +2,7 @@
 
 Respostas do usuário às perguntas de `prompts-notebooklm.md`, guardadas para análise depois que todas chegarem. O texto é o que o NotebookLM respondeu, com duas edições: tirei os emojis e as ofertas do fim de cada resposta ("Quer que eu monte..."). Os números entre colchetes são as citações das fontes do caderno do usuário.
 
-Situação: recebidas contexto, 1, 2, 3, 4, 5, 6 e 7. Faltam 8 a 13.
+Situação: recebidas todas (contexto e 1 a 13).
 
 ---
 
@@ -388,24 +388,198 @@ Em vaults do **Obsidian com 10.000 a 50.000 notas**, o modelo *local-first* base
 
 ## 8. Captura rápida e triagem
 
-(Aguardando.)
+### 1. Fluxo Recomendado: Da Captura Rápida (Inbox) à Nota Permanente
+
+1. **Captura Fricção-Zero (A Pasta `_inbox`)**: Todas as anotações rápidas, áudios, clippings de web e transcrições de reuniões devem cair em um único diretório temporário: a pasta `_inbox` (ou `00-Inbox`) [3-5]. **Não perca tempo formatando ou categorizando no momento da captura** [1, 6]. Se você utiliza agentes de IA no terminal, comandos simplificados como `/capture` podem injetar ideias diretamente no inbox sem interromper seu raciocínio [7, 8].
+2. **Filtragem e Carência Temporal**: Deixe as notas repousarem no inbox por **1 a 2 dias** antes do processamento definitivo [1, 9]. Esse intervalo frio permite descartar ideias passageiras e filtrar ruídos que pareceram urgentes no momento do registro [9].
+3. **Transformação Atômica e Conexão (Nota Permanente)**:
+   * **Técnica de Feynman**: Ao revisar a nota do inbox, reescreva o conceito **com suas próprias palavras** em um novo arquivo [1, 10, 11].
+   * **Atomicidade**: Garanta que a nova nota trate de um único conceito autônomo [10, 13, 14].
+   * **Regra do Link Único**: Nenhuma nota vai para a pasta definitiva sem pelo menos um `[[wikilink]]` conectando-a a uma nota preexistente ou a um MOC [10, 15].
+   * *Processamento Assistido por IA*: comandos como `/process-inbox` para a IA analisar os itens brutos, sugerir referências cruzadas, aplicar tags e organizar a nota no destino [8, 16].
+
+### 2. O Que Plugins como Templater e QuickAdd Resolvem
+
+* **Templater**: motor avançado de modelos baseado em JavaScript [17, 18]. Insere datas/horas dinâmicas no YAML, abre prompts interativos na criação, manipula nomes de arquivo e executa comandos externos [17, 19, 20].
+* **QuickAdd**: velocidade de entrada e macros [21]. Atalhos globais para injetar texto, criar estruturas de projeto por formulário e encadear ações [21, 22].
+
+### 3. Dá para Ter um Bom Fluxo Apenas com Recursos Nativos?
+
+Sim. Com **Obsidian Bases** (v1.9+) + Templates + Propriedades (YAML) [19, 23, 24]:
+
+* **Gerador Automático de Notas via Bases**: cada visão atua como criador de modelos; o botão "Novo" gera nota herdando as propriedades/tags/status do filtro [25, 26].
+* **Triagem e Edição em Lote na Inbox**: ver a `00-Inbox` numa tabela do Bases e editar propriedades direto nas células [23, 27, 28].
+* **Padronização Nativa de YAML**: o editor visual de propriedades valida tipos sem erros de sintaxe [23, 24, 29].
 
 ## 9. Notas que não apodrecem e ritmo de revisão
 
-(Aguardando.)
+### 1. Resumo das Ideias-Chave (Zettelkasten & Andy Matuschak no Obsidian)
+
+* **Atomicidade**: cada nota permanente isola **um único conceito/fato/argumento/decisão** [1-3].
+* **Reescrita Autoral (Feynman)**: toda nota permanente escrita **com suas próprias palavras** [2, 3, 5].
+* **Estrutura Emergente (Bottom-Up)**: a organização surge das conexões (`[[wikilinks]]`), não de pastas rígidas [2, 6, 7, 8].
+* **Títulos Declarativos**: o nome da nota é a própria declaração do conceito (ex.: `A leitura de frontmatter reduz o consumo de tokens` em vez de `Economia de Tokens`) [9, 10].
+* **Fluxo Evergreen**: as notas maturam (coleta, processamento, estado atômico/estável) e são refinadas conforme novas ideias se conectam [9, 11].
+
+### 2. Como Escrever Notas que Continuam Úteis
+
+1. **Autonomia e Autossuficiência**: inteligível por si só no futuro, sem reconsultar a fonte [2].
+2. **Regra do Link Único**: toda nova nota permanente com pelo menos um `[[wikilink]]` para nota ou MOC [3, 12, 13].
+3. **Metadados Padronizados (YAML)**: `id:` estável, `type: concept` (ou `permanent`), `aliases:`, 2 a 5 `tags:` planas [10, 13].
+4. **Resumo Visual / Callouts**: abre com síntese curta e callouts com a ideia principal [3, 14].
+
+### 3. Como Evitar o "Lixo Esquecido" e Rotinas de Revisão
+
+**A. Fricção Proposital**: inbox com período de carência (deixe repousar 1 a 3 dias; o que parecia urgente some) [11, 16, 17].
+
+**B. Rotinas de Revisão da Comunidade**:
+
+* **Revisão Focada em Projetos (Just-in-Time)**: a melhor revisão ocorre **quando você produz algo**; ao pesquisar um tema, siga backlinks e crie novos links entre o que sabia e o que está aprendendo [18, 19].
+* **Manutenção Periódica**: diária (5–10 min: esvaziar inbox); semanal (1 h: transformar inbox em notas permanentes, atualizar MOCs, limpar divergências); mensal (varredura por "ilhas" — notas sem backlinks — para conectá-las) [5, 20, 21, 22].
+* **Revisão Auxiliada por Agentes**: rotinas no terminal (`/process-inbox`, `/weekly-review`, busca semântica) para sugerir referências cruzadas esquecidas e identificar ideias com conexões suficientes para virar um MOC [20-22].
 
 ## 10. Pesquisa externa → conhecimento validado → skill
 
-(Aguardando.)
+A chave é combinar PARA + Zettelkasten [1] com um padrão estrito de **proveniência no YAML e no texto** [2, 3].
+
+### 1. Separação de Estrutura: Notas de Literatura vs. Notas Permanentes
+
+* **Pasta de Pesquisa/Fontes (`20-Literature/` ou `30-Resources/Literature/`)**: resumos de livros, guias, transcrições, FAQs, linhas do tempo [1]. O texto reflete **a visão da fonte** [1, 4]. YAML com `type: literature`, `source: "https://..."` ou `author:` [1, 3].
+* **Pasta de Conclusões Validadas (`30-Permanent/`)**: **apenas as suas conclusões testadas** [1, 4], atômicas e pela Técnica de Feynman [4, 5]. YAML com `type: permanent` e `status: verificado` [1, 4].
+
+### 2. Como Registrar e Rastrear a Fonte de Cada Afirmação
+
+1. **Atribuição Global no Frontmatter**: `source:` apontando para a nota de literatura ou URL [1, 3].
+2. **Conexão Granular com Wikilinks de Seção**: no corpo, link para o cabeçalho/bloco exato da fonte, ex.: `... [[Literature - Guia Rclone 2026#Comportamento do Cache]]` [2].
+3. **Contraste Visual com Callouts Semânticos**: diferencie a afirmação da fonte do seu teste:
+   ```markdown
+   > [!quote] Afirmação da Fonte
+   > A doc afirma que `--transfers 4` é ideal para 100Mbps [[Literature - Rclone Doc#Performance]].
+
+   > [!check] Validação Prática
+   > Testado em produção em 11/10/2026: estabilizou melhor com `--transfers 2`.
+   ```
+
+### 3. Transformando Pesquisa em Procedimento Reutilizável (SOP)
+
+Um SOP mora em **`50-Areas/`** (ou `20-Areas/`), voltado para execução rápida mas com backlinks transparentes para a pesquisa de origem [1, 5, 6]. O frontmatter traz `type: sop`, `area:`, `status: verificado` e uma lista `sources:` de notas de literatura. O corpo separa, em cada passo, **o que foi comprovado** (teste prático) do **que é recomendação da fonte** (com o wikilink para o trecho).
 
 ## 11. Procedimentos, prompts e agentes reutilizáveis
 
-(Aguardando.)
+Conhecimento (Zettelkasten) é conceitual e atemporal; procedimentos e definições de agentes são **ativos de execução** — demandam validação contínua, tipagem clara e recuperação por filtros [1, 2].
+
+### 1. Arquitetura de Pastas: Ilhas de Execução vs. Conhecimento
+
+```text
+meu-vault/
+├── CLAUDE.md                      # Manual operacional raiz da IA (< 200 linhas)
+├── .claude/                       # [SISTEMA DA IA]
+│   ├── rules/                     # Regras ativadas por caminho (path-scoped)
+│   ├── skills/                    # Agent Skills (skills/<nome>/SKILL.md)
+│   └── agents/                    # Subagentes (ex: code-reviewer.md)
+├── 00-Inbox/
+├── 20-Areas/                      # [OPERACIONAL] SOPs e Checklists
+│   ├── SOPs/
+│   └── Checklists/
+├── 30-Resources/                  # [CONHECIMENTO] Zettelkasten
+└── 90-System/                     # [SISTEMA DO OBSIDIAN]
+    ├── Templates/
+    ├── Prompts/                   # Repositório de prompts reutilizáveis
+    └── Bases/                     # Arquivos .base
+```
+
+* **Definições de agentes e habilidades de IA**: em `.claude/skills/` e `.claude/agents/` no padrão Agent Skills (`SKILL.md`) [4-8].
+* **SOPs e Checklists**: em `20-Areas/` [9].
+* **Conhecimento e fatos**: isolados em `30-Resources/` ou `Permanent/`, atômicos [9].
+
+### 2. Esquema de Propriedades (YAML) Operacional
+
+```yaml
+---
+id: sop-deploy-producao
+type: sop                   # sop, checklist, prompt-template, agent-spec
+status: active              # draft, active, deprecated
+version: 1.2.0
+last_updated: 2026-10-11
+domain: devops
+tags: [sop, deploy]
+aliases: ["Procedimento de Deploy", "SOP-01"]
+---
+```
+
+### 3. Convenção de Nomes para Autocompletar
+
+Prefixos funcionais: `SOP - Backup Offsite com Rclone.md`, `Checklist - Pre-flight Release Produção.md`, `Prompt - Gerador de PRDs.md`, `Agent - Especialista em Revisão de Segurança.md`. Ao digitar `[[SOP` o autocompletar exibe o catálogo correspondente.
+
+### 4. Versionamento e Rastreabilidade
+
+1. **Git (recomendado)**: histórico de commits registra quem alterou cada linha sem poluir a nota [16, 17].
+2. **Log interno (callouts)**: bloco `> [!history] Histórico de Revisões` no fim do procedimento.
+
+### 5. Recuperação Dinâmica com Obsidian Bases
+
+Catálogos `.base` por `type` (ex.: `sops.base` com `type = "sop"` mostrando `domain`, `status`, `version`, `last_updated`; `prompts.base` como galeria de cartões por `type = "prompt-template"`). Editar status/versão direto na célula atualiza o YAML em tempo real [10, 11, 18, 19].
 
 ## 12. Anexos
 
-(Aguardando.)
+### 1. Onde Guardar (Settings > Files & links > Default location for new attachments)
+
+* **Pasta centralizada (recomendado)**: pasta global dedicada (ex.: `60-Resources/Attachments/` ou `_assets/`) — concentra binários, facilita backup, sync e exclusão [1, 2, 3].
+* **Subpasta na pasta da nota**: cria `./assets/` junto da nota ativa — útil se você move pastas de projeto inteiras.
+
+### 2. Como Manter o Vault Limpo
+
+* **Padronização de nomes na importação**: evite `Pasted image ...png`; use plugin como **Paste Image Rename** [6].
+* **Filtro de ignorados (`app.json` / `.claudeignore`)**: `userIgnoreFilters` em `.obsidian/app.json` para o indexador não varrer binários pesados [7, 8]:
+  ```json
+  { "userIgnoreFilters": ["assets/", "*.pdf", "*.png", "*.jpg"] }
+  ```
+* **Limpeza de anexos órfãos**: plugins (Attachment Organizer) para remover imagens/PDFs sem nenhum `[[wikilink]]` [9].
+
+### 3. Como Referenciar e Citar a Origem
+
+* **Sintaxe**: embutir `![[diagrama.png]]` / `![[documento.pdf]]`; link simples `[[documento.pdf]]`; página específica `![[documento.pdf#page=5]]`.
+* **Rastreabilidade via Nota de Literatura**: não deixe o PDF "solto"; crie uma nota em `20-Literature/` com `type: literature`, `source:` e `attachment: "[[arquivo.pdf]]"` [1, 10].
+* **Citação contextual (callout)**: `> [!quote] Origem da Imagem` com o wikilink do anexo e o trecho da fonte [11].
+
+### 4. Plugins Recomendados
+
+1. **Omnisearch**: busca com ranking BM25, pesquisa dentro de PDFs e OCR em imagens [4, 12].
+2. **Image Converter / Compression**: comprime/converte imagens coladas para `.webp` [13].
+3. **Paste Image Rename**: pede nome descritivo ao colar imagem [6].
 
 ## 13. Dados sensíveis, sincronização e backup
 
-(Aguardando.)
+O Obsidian é *local-first* em texto plano `.md`: qualquer processo com leitura no sistema de arquivos vê o conteúdo [2-4]. A abordagem é em camadas [1].
+
+### 1. Excluir Pastas da Sync e Criptografar São Comuns? Sim [1, 5, 6]
+
+* **Sincronização seletiva**: isole dados críticos numa pasta (ex.: `50-Areas/Clientes-Confidencial/` ou `_secretos/`) e exclua-a da sincronização para dispositivos móveis [6, 7, 8].
+* **Criptografia E2EE**: na transmissão e nos snapshots de backup fora da máquina [5, 9, 10].
+
+### 2. Sincronização por Método
+
+| Método | Segurança para dados sensíveis | Como lidar |
+| :--- | :--- | :--- |
+| **Obsidian Sync (oficial)** | Muito alto: E2EE AES-256 nativa; dados cifrados localmente antes de sair [10-12]. | Usar **Pastas Excluídas** para não baixar confidenciais em móveis [6, 8]. |
+| **Git / GitHub / GitLab** | Baixo a médio: texto plano, sem cripto nativa [13, 14]. | `.gitignore` para pastas confidenciais/`.env`, ou `git-crypt` [14, 15]. |
+| **Nuvens genéricas (iCloud, Drive, Dropbox)** | Frágil/inadequado: sem E2EE por arquivo, falhas de sync; iCloud pode descarregar cache no iOS e sobrescrever por arquivo vazio [5, 16, 17, 18]. | Evitar para este vault. |
+
+### 3. Proteção Contra Agentes de IA em Terminal
+
+O `.gitignore` **não basta**: ferramentas `Glob`/busca de agentes podem ignorá-lo e ler segredos [19-21]. Use **read deny rules** em `.claude/settings.local.json`:
+
+```json
+{
+  "permissions": {
+    "deny": ["read:50-Areas/Clientes-Confidencial/*", "read:**/*.env", "read:**/*.pem"]
+  }
+}
+```
+
+### 4. Backup Resiliente (sync != backup)
+
+Sincronizar replica deleção/corrupção; backup preserva histórico imutável [16, 24-26].
+
+1. **Backup local criptografado**: plugin **Local Backup** gera `.zip` com data em volume local cifrado (BitLocker/FileVault) [27-29].
+2. **Off-site com `rclone crypt`**: cifra conteúdo e nomes com AES-256 antes do envio (Backblaze B2, S3); flag `--backup-dir` move alterados/apagados para pastas de versão sem sobrescrever o histórico [9, 30-33].
