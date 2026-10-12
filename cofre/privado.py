@@ -6,12 +6,19 @@ regra em JavaScript (adapters/opencode/plugins/cofre.js).
 
 O nome relativo (99-Privado) só conta quando o texto também aponta para o vault ou a sessão roda
 dentro dele, para não bloquear nada em outros projetos que tenham uma pasta com o mesmo nome.
+
+Curinga em comando (`cat 99-*/x.md`, `head */*.md`) também conta quando o padrão, a partir do
+vault, cobre um caminho dentro da pasta privada. `*` sozinho não conta (seria multiplicação,
+lista em Markdown...) e argumentos de conteúdo (texto de arquivo, trecho de edição) ficam de fora.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import posixpath
+import re
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 from .config import vault_configurado
@@ -21,21 +28,41 @@ MENSAGEM = ("Bloqueado pelo cofre: esse caminho fica numa pasta privada do usuá
             "do cofre). Não tente outro caminho nem outro comando; se precisar do conteúdo, peça ao usuário.")
 
 
+# Argumentos de texto livre: curinga ali é Markdown ou código, não caminho.
+TEXTO_LIVRE = {"content", "contents", "text", "body", "old_string", "new_string", "oldstring", "newstring",
+               "patch", "diff", "replacement", "new_content", "old_content"}
+_SEPARA = re.compile(r"[\s\"'`=;|&()<>,]+")
+_CURINGA = re.compile(r"[*?\[]")
+_ABSOLUTO = re.compile(r"^(/|~|[a-z]:/)")
+
+
 def _normal(texto) -> str:
     return str(texto).replace("\\", "/").lower()
 
 
-def _textos(valor, saida: list[str] | None = None) -> list[str]:
+def _textos(valor, chave=None, saida: list | None = None) -> list[tuple]:
+    """(chave, texto) de cada string dos argumentos; a chave é a do dicionário mais próximo."""
     saida = [] if saida is None else saida
     if isinstance(valor, str):
-        saida.append(valor)
+        saida.append((chave, valor))
     elif isinstance(valor, dict):
-        for v in valor.values():
-            _textos(v, saida)
+        for k, v in valor.items():
+            _textos(v, str(k).lower(), saida)
     elif isinstance(valor, (list, tuple)):
         for v in valor:
-            _textos(v, saida)
+            _textos(v, chave, saida)
     return saida
+
+
+def _cobre(padrao: list[str], privada: list[str]) -> bool:
+    """O padrão de curinga (por segmento, `**` vale qualquer profundidade) alcança a pasta privada?"""
+    if not privada:
+        return True
+    if not padrao:
+        return False
+    if padrao[0] == "**":
+        return _cobre(padrao[1:], privada) or _cobre(padrao, privada[1:])
+    return fnmatchcase(privada[0], padrao[0]) and _cobre(padrao[1:], privada[1:])
 
 
 def caminhos(cofre: Cofre, vault: Path | None = None) -> dict:
@@ -81,11 +108,39 @@ class Guarda:
 
     def toca(self, args, cwd=None) -> bool:
         na = self.na_vault(cwd)
-        for t in _textos(args):
+        for chave, t in _textos(args):
             if self.menciona(t, na):
                 return True
             if cwd and len(t) < 1000 and "\n" not in t and self.menciona(os.path.normpath(os.path.join(cwd, t)), na):
                 return True
+            if chave not in TEXTO_LIVRE and self.curinga(t, cwd):
+                return True
+        return False
+
+    def _dentro(self, cwd):
+        """Caminho do cwd relativo ao vault ('' na raiz), ou None fora dele."""
+        aqui = _normal(cwd or "").rstrip("/")
+        for v in self.vaults:
+            if cwd and (aqui == v or aqui.startswith(v + "/")):
+                return aqui[len(v) + 1:]
+        return None
+
+    def curinga(self, texto: str, cwd=None) -> bool:
+        if not self.relativas or not _CURINGA.search(texto):
+            return False
+        base = self._dentro(cwd)
+        for tok in _SEPARA.split(_normal(texto)):
+            if tok in ("", "*", "**") or not _CURINGA.search(tok):
+                continue
+            restos = [tok[len(v) + 1:] for v in self.vaults if tok.startswith(v + "/")]
+            if not restos and base is not None and not _ABSOLUTO.match(tok):
+                rel = posixpath.normpath(posixpath.join(base, tok))
+                if not rel.startswith(".."):
+                    restos.append(rel)
+            for resto in restos:
+                partes = [x for x in resto.split("/") if x not in ("", ".")]
+                if any(_cobre(partes, p.split("/")) for p in self.relativas):
+                    return True
         return False
 
     def filtrar(self, texto: str, cwd=None) -> str:

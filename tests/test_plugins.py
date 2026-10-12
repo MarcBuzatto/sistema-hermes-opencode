@@ -166,6 +166,17 @@ class TestGuardaPrivadaHermes(PluginTeste):
         # Dentro do vault, o nome relativo basta.
         ctx.secoes["cofre.contexto"]({"session_id": "s2", "cwd": str(self.vault)})
         self.assertEqual(antes(tool_name="terminal", args={"command": "cat 99-Privado/contrato.md"}, task_id="s2")["action"], "block")
+        # Curinga que alcança a pasta privada também bloqueia; curinga que não alcança, não.
+        for cmd in ("cat 99-*/contrato.md", "head */*.md", "cat $(ls -d 99*)/contrato.md", "cat 9[0-9]-Privado/x.md"):
+            self.assertEqual(antes(tool_name="terminal", args={"command": cmd}, task_id="s2")["action"], "block", cmd)
+        for cmd in ("ls *.md", "cat *", "python3 -c 'print(2*3)'", "grep -E 'a.*b' 30-Conhecimento/x.md"):
+            self.assertIsNone(antes(tool_name="terminal", args={"command": cmd}, task_id="s2"), cmd)
+        self.assertIsNone(antes(tool_name="write_file", args={"path": "x.md", "content": "* item\n/* c */\n**negrito**"},
+                                task_id="s2"), "curinga em conteúdo de arquivo não é caminho")
+        self.assertIsNone(antes(tool_name="terminal", args={"command": "cat 99-*/x.md"}, task_id="s1"),
+                          "curinga relativo fora do vault não bloqueia outros projetos")
+        self.assertEqual(antes(tool_name="terminal", args={"command": f"cat {self.vault}/99-*/contrato.md"},
+                               task_id="s1")["action"], "block")
         saida = f"30-Conhecimento/a.md:1:x\n{privada}:1:multa"
         self.assertEqual(depois(tool_name="search_files", args={}, result=saida, task_id="s1"), "30-Conhecimento/a.md:1:x")
         self.assertIsNone(depois(tool_name="search_files", args={}, result="nada privado", task_id="s1"))
@@ -224,6 +235,9 @@ class TestPluginOpenCode(PluginTeste):
         self.assertFalse(res["outro_projeto"], "nome relativo fora do vault não bloqueia outros projetos")
         self.assertEqual(res["grep_filtrado"], "30-Conhecimento/a.md:1:x")
         self.assertEqual(res["json_filtrado"], {"output": "pub.md:1:x", "code": 0})
+        self.assertTrue(res["curinga_abs"])
+        self.assertFalse(res["curinga_outro_projeto"])
+        self.assertEqual(res["curinga_no_vault"], [True, True, True, False, False, False, False])
         self.assertTrue(res["v2_privado"])
         self.assertFalse(res["v2_normal"])
         self.assertEqual(res["v2_filtrado"], ["ok.md:1:x", "a"])
@@ -272,6 +286,21 @@ r.privado_abs = await bloqueia("read", { filePath: vault + "/99-Privado/contrato
 r.privado_comando = await bloqueia("bash", { command: `cat "${vault}/99-Privado/contrato.md"` })
 r.vault_normal = await bloqueia("read", { filePath: vault + "/30-Conhecimento/LEIA-ME.md" })
 r.outro_projeto = await bloqueia("bash", { command: "ls 99-Privado" })
+r.curinga_abs = await bloqueia("bash", { command: `cat ${vault}/99-*/contrato.md` })
+r.curinga_outro_projeto = await bloqueia("bash", { command: "cat 99-*/contrato.md" })
+const noVault = await p.server({ directory: vault })
+const bloqueiaNoVault = async (tool, args) => {
+  try { await noVault["tool.execute.before"]({ tool }, { args }); return false } catch { return true }
+}
+r.curinga_no_vault = [
+  await bloqueiaNoVault("bash", { command: "head */*.md" }),
+  await bloqueiaNoVault("bash", { command: "cat $(ls -d 99*)/contrato.md" }),
+  await bloqueiaNoVault("bash", { command: "cat 9[0-9]-Privado/x.md" }),
+  await bloqueiaNoVault("bash", { command: "ls *.md" }),
+  await bloqueiaNoVault("bash", { command: "python3 -c 'print(2*3)'" }),
+  await bloqueiaNoVault("bash", { command: "cat *" }),
+  await bloqueiaNoVault("write", { filePath: "x.md", content: "* item\n/* c */\n**negrito**" }),
+]
 const saida = { output: `30-Conhecimento/a.md:1:x\n${vault}/99-Privado/contrato.md:1:multa` }
 await v1["tool.execute.after"]({ tool: "grep" }, saida)
 r.grep_filtrado = saida.output

@@ -15,7 +15,7 @@
 // Gerado pelo instalador do cofre.
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
-import { resolve as resolverCaminho } from "node:path"
+import { posix, resolve as resolverCaminho } from "node:path"
 
 const PYTHON = "{{PYTHON}}"
 const APP = "{{APP}}"
@@ -50,13 +50,6 @@ const MSG_PRIVADO =
   "Bloqueado pelo cofre: esse caminho fica numa pasta privada do usuário (99-Privado ou pastas_privadas do cofre). " +
   "Não tente outro caminho nem outro comando; se precisar do conteúdo, peça ao usuário."
 const normal = (s) => String(s).replace(/\\/g, "/").toLowerCase()
-
-function textosDe(valor, saida = []) {
-  if (typeof valor === "string") saida.push(valor)
-  else if (Array.isArray(valor)) valor.forEach((v) => textosDe(v, saida))
-  else if (valor && typeof valor === "object") Object.values(valor).forEach((v) => textosDe(v, saida))
-  return saida
-}
 
 // Caminhos privados vindos do cofre. Nome relativo (99-Privado) só conta quando o texto também
 // aponta para o vault ou a sessão roda dentro dele, para não bloquear nada em outros projetos.
@@ -129,11 +122,73 @@ function resultadoSemPrivado(r, pv) {
   return novo
 }
 
+// Curinga em comando (cat 99-*/x.md, head */*.md) conta quando o padrão, a partir do vault,
+// alcança a pasta privada. `*` sozinho e argumentos de conteúdo ficam de fora.
+const TEXTO_LIVRE = new Set(["content", "contents", "text", "body", "old_string", "new_string", "oldstring",
+  "newstring", "patch", "diff", "replacement", "new_content", "old_content"])
+const CURINGA = /[*?[]/
+
+function paresDe(valor, chave = null, saida = []) {
+  if (typeof valor === "string") saida.push([chave, valor])
+  else if (Array.isArray(valor)) valor.forEach((v) => paresDe(v, chave, saida))
+  else if (valor && typeof valor === "object")
+    Object.entries(valor).forEach(([k, v]) => paresDe(v, k.toLowerCase(), saida))
+  return saida
+}
+
+function casaSegmento(nome, padrao) {
+  let r = ""
+  for (let i = 0; i < padrao.length; i++) {
+    const c = padrao[i]
+    const fim = c === "[" ? padrao.indexOf("]", i + 2) : -1
+    if (c === "*") r += ".*"
+    else if (c === "?") r += "."
+    else if (fim > 0) {
+      const classe = padrao.slice(i + 1, fim).replace(/\\/g, "\\\\")
+      r += "[" + (classe[0] === "!" ? "^" + classe.slice(1) : classe) + "]"
+      i = fim
+    } else r += c.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+  }
+  try {
+    return new RegExp("^" + r + "$", "s").test(nome)
+  } catch {
+    return false
+  }
+}
+
+function cobre(padrao, privada) {
+  if (!privada.length) return true
+  if (!padrao.length) return false
+  if (padrao[0] === "**") return cobre(padrao.slice(1), privada) || cobre(padrao, privada.slice(1))
+  return casaSegmento(privada[0], padrao[0]) && cobre(padrao.slice(1), privada.slice(1))
+}
+
+function curingaPrivado(texto, pv, dir) {
+  if (!pv.relativas.length || !CURINGA.test(texto)) return false
+  const aqui = normal(dir ?? "").replace(/\/+$/, "")
+  const v = dir ? pv.vault.find((x) => aqui === x || aqui.startsWith(x + "/")) : undefined
+  const base = v === undefined ? null : aqui.slice(v.length + 1)
+  for (const tok of normal(texto).split(/[\s"'`=;|&()<>,]+/)) {
+    if (!tok || tok === "*" || tok === "**" || !CURINGA.test(tok)) continue
+    const restos = pv.vault.filter((x) => tok.startsWith(x + "/")).map((x) => tok.slice(x.length + 1))
+    if (!restos.length && base !== null && !/^(\/|~|[a-z]:\/)/.test(tok)) {
+      const rel = posix.normalize(posix.join(base, tok))
+      if (!rel.startsWith("..")) restos.push(rel)
+    }
+    for (const resto of restos) {
+      const partes = resto.split("/").filter((x) => x && x !== ".")
+      if (pv.relativas.some((p) => cobre(partes, p.split("/")))) return true
+    }
+  }
+  return false
+}
+
 function tocaPrivado(args, pv, dir) {
-  return textosDe(args).some(
-    (t) =>
+  return paresDe(args).some(
+    ([chave, t]) =>
       mencionaPrivado(t, pv) ||
-      (Boolean(dir) && t.length < 1000 && !t.includes("\n") && mencionaPrivado(resolverCaminho(dir, t), pv)),
+      (Boolean(dir) && t.length < 1000 && !t.includes("\n") && mencionaPrivado(resolverCaminho(dir, t), pv)) ||
+      (!TEXTO_LIVRE.has(chave) && curingaPrivado(t, pv, dir)),
   )
 }
 

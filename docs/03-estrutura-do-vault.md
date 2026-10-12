@@ -147,7 +147,9 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | Git do vault | `99-Privado/` está no `.gitignore` do template (`cofre init` acrescenta a linha em vaults antigos). O `cofre revisar` dá erro se uma pasta privada estiver versionada ou fora do `.gitignore`. |
 | Plugin do Hermes | `pre_tool_call` bloqueia ferramentas cujos argumentos apontem para a pasta (o Hermes devolve a mensagem do bloqueio ao modelo); `transform_tool_result` tira as linhas com o caminho dela dos resultados. Erro interno da guarda deixa a ferramenta passar, para não travar o agente. |
 
-Não é criptografia: um agente com terminal livre ainda pode ler o disco por caminhos que nenhuma regra prevê. Senhas, tokens e chaves não ficam nem aqui: use um gerenciador de senhas e registre no vault só onde a credencial fica (o cofre bloqueia credenciais nas escritas e o `cofre revisar` procura nas notas).
+Os plugins também pegam curinga que alcança a pasta (`cat 99-*/x.md`, `head */*.md`, `rg -g '**/*.md'` dentro do vault); `*` sozinho não conta, porque aparece em código e Markdown.
+
+Não é criptografia: um agente com terminal livre ainda pode ler o disco por caminhos que nenhuma regra prevê, como um comando recursivo que imprime conteúdo sem o nome do arquivo (`grep -rh`, `find -exec cat`) ou um script que monta o caminho em partes. Senhas, tokens e chaves não ficam nem aqui: use um gerenciador de senhas e registre no vault só onde a credencial fica (o cofre bloqueia credenciais nas escritas e o `cofre revisar` procura nas notas).
 
 Sincronização e backup (da sua pesquisa, resposta 13; confirme preços e recursos atuais nos sites oficiais):
 
