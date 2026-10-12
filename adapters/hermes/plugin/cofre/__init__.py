@@ -10,6 +10,8 @@
   (spec, tarefa atual e próximo passo) em toda mensagem; sem spec, uma âncora com o foco
   atual a cada N turnos. Depois de N mensagens sem checkpoint, anexa um lembrete.
 - post_tool_call + on_session_finalize: avisa ao fechar uma sessão longa sem checkpoint.
+- Ao carregar: agentes do vault (65-Agentes) viram personalities (`/personality nome`) na
+  próxima sessão.
 - pre_tool_call + transform_tool_result: bloqueia ferramentas que apontem para a pasta privada
   do vault (99-Privado e pastas_privadas) e tira as linhas com o caminho dela dos resultados.
 
@@ -19,6 +21,7 @@ Gerado pelo instalador do cofre; COFRE_APP aponta para a instalação do pacote.
 import logging
 import os
 import sys
+import threading
 import time
 
 COFRE_APP = r"{{COFRE_APP}}"
@@ -128,7 +131,21 @@ def _cwd_da_chamada(task_id, kwargs):
     return _cwd_sessao.get(kwargs.get("session_id") or task_id) or os.getcwd()
 
 
+def _sincronizar_agentes():
+    """Roda numa thread: o Hermes já leu a config; o que mudar vale na próxima sessão."""
+    try:
+        _garantir_path()
+        from cofre import agentes, hermes_config
+
+        config = hermes_config.config_padrao()
+        if config.exists():
+            agentes.sincronizar_hermes(_cofre().raiz, config, sys.executable)
+    except Exception as e:
+        log.warning("cofre: agentes do vault -> Hermes: %s", e)
+
+
 def register(ctx):
+    threading.Thread(target=_sincronizar_agentes, daemon=True, name="cofre-agentes").start()
     def secao(info):
         cwd = info.get("cwd") or os.getcwd()
         if info.get("session_id"):

@@ -26,6 +26,7 @@ PASTAS = {
     "clientes": "40-Clientes",
     "fontes": "50-Fontes",
     "skills": "60-Skills",
+    "agentes": "65-Agentes",
     "anexos": "80-Anexos",
     "arquivo": "90-Arquivo",
     "privado": "99-Privado",

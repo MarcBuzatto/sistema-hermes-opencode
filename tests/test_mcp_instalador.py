@@ -84,7 +84,11 @@ class TestInstalador(CofreTeste):
         (oc / "skills" / "minha-skill" / "SKILL.md").write_text("---\nname: minha-skill\n---\n", encoding="utf-8")
         env = self.ambiente(home)
         vault = home / "Cofre"
+        (vault / "65-Agentes").mkdir(parents=True)
+        (vault / "65-Agentes" / "revisor.md").write_text(
+            "---\ndescription: Revisa segurança antes de publicar.\n---\nVocê revisa segurança.\n", encoding="utf-8")
         self.rodar(env, "--vault", str(vault), "--sem-path")
+        self.assertIn("Você revisa segurança.", (oc / "agents" / "revisor.md").read_text(encoding="utf-8"))
 
         self.assertEqual((oc / "AGENTS.md").read_text(encoding="utf-8"), agents)
         self.assertEqual((home / ".hermes" / "SOUL.md").read_text(encoding="utf-8"), "Seja direto.\n")
@@ -110,6 +114,7 @@ class TestInstalador(CofreTeste):
         self.assertNotIn("mcp", cfg)
         self.assertFalse(sincronizada.exists())
         self.assertFalse((oc / "agents" / "spec.md").exists())
+        self.assertFalse((oc / "agents" / "revisor.md").exists(), "agente do vault sai na desinstalação")
         self.assertTrue((oc / "skills" / "minha-skill" / "SKILL.md").exists(), "skill do usuário preservada")
         self.assertTrue((vault / "00-Sistema" / "Perfil.md").exists())
 
@@ -192,7 +197,11 @@ class TestInstalador(CofreTeste):
             "mcp_servers:\n  cofre: '{\"command\": \"x\"}'\n  github: {command: npx}\n", encoding="utf-8")
         env = self.ambiente(home)
         env["PATH"] = str(self.hermes_falso()) + os.pathsep + env["PATH"]
-        self.rodar(env, "--vault", str(home / "Cofre"), "--sem-opencode", "--sem-path")
+        vault = home / "Cofre"
+        (vault / "65-Agentes").mkdir(parents=True)
+        (vault / "65-Agentes" / "revisor.md").write_text(
+            "---\ndescription: Revisa segurança antes de publicar.\n---\nVocê revisa segurança.\n", encoding="utf-8")
+        self.rodar(env, "--vault", str(vault), "--sem-opencode", "--sem-path")
         cfg = yaml.safe_load((home / ".hermes" / "config.yaml").read_text(encoding="utf-8"))
         self.assertEqual(cfg["model"], {"provider": "custom", "default": "meu-modelo"}, "config do usuário intacta")
         servidor = cfg["mcp_servers"]["cofre"]
@@ -206,12 +215,14 @@ class TestInstalador(CofreTeste):
         spec = cfg["agent"]["personalities"]["spec"]
         self.assertIn("[cofre]", spec["description"])
         self.assertIn("MODO SPEC", spec["system_prompt"])
+        self.assertEqual(cfg["agent"]["personalities"]["revisor"]["system_prompt"], "Você revisa segurança.")
 
         self.rodar(env, "--desinstalar")
         cfg = yaml.safe_load((home / ".hermes" / "config.yaml").read_text(encoding="utf-8"))
         self.assertNotIn("cofre", cfg["mcp_servers"])
         self.assertEqual(cfg["plugins"]["enabled"], ["outro"])
         self.assertNotIn("spec", (cfg.get("agent") or {}).get("personalities") or {})
+        self.assertNotIn("revisor", (cfg.get("agent") or {}).get("personalities") or {})
 
     @unittest.skipIf(os.name == "nt", "binário falso com shebang")
     def test_hermes_sem_python_com_yaml_recebe_instrucao_em_yaml(self):

@@ -281,6 +281,37 @@ def cmd_skills(a):
                   + "".join(f"\n[aviso] {x}" for x in avisos))
 
 
+def cmd_agentes(a):
+    from . import agentes, hermes_config
+
+    cofre = _cofre(a)
+    if a.acao == "listar":
+        _imprimir(agentes.resumo(cofre.raiz))
+        return 0
+    if a.acao == "verificar":
+        achados = agentes.verificar(cofre.raiz)
+        _imprimir("\n".join(f"- [{g}] {n}: {m}" for g, n, m in achados) or "Agentes sem problemas.")
+        return 1 if any(g == "erro" for g, _, _ in achados) else 0
+    linhas = []
+    destino_oc = Path(os.path.expanduser(a.opencode)) if a.opencode else _destino_skills_opencode().parent / "agents"
+    automatico = not a.opencode and not a.hermes
+    if a.opencode or (automatico and destino_oc.parent.is_dir()):
+        escritos, removidos, avisos = agentes.sincronizar_opencode(cofre.raiz, destino_oc, remover=a.remover)
+        linhas.append(f"OpenCode ({destino_oc}): {len(escritos)} atualizado(s), {len(removidos)} removido(s)"
+                      + "".join(f"\n[aviso] {x}" for x in avisos))
+    config_h = Path(os.path.expanduser(a.hermes)) if a.hermes else hermes_config.config_padrao()
+    if a.hermes or (automatico and config_h.parent.is_dir()):
+        python = hermes_config.python_para_editar()
+        if not python:
+            linhas.append("Hermes: não achei um Python com PyYAML (o do Hermes); rode de novo com o `hermes` no PATH.")
+        else:
+            escritos, removidos, avisos = agentes.sincronizar_hermes(cofre.raiz, config_h, python, remover=a.remover)
+            linhas.append(f"Hermes ({config_h}): {len(escritos)} atualizada(s), {len(removidos)} removida(s); "
+                          "use /personality <nome>" + "".join(f"\n[aviso] {x}" for x in avisos))
+    _imprimir("\n".join(linhas) or "Nem OpenCode nem Hermes encontrados; use --opencode ou --hermes.")
+    return 0
+
+
 def cmd_mcp(a):
     from .mcp import main as mcp_main
     return mcp_main(a.vault)
@@ -567,6 +598,12 @@ def criar_parser() -> argparse.ArgumentParser:
     sp.add_argument("acao", choices=["listar", "verificar", "sincronizar"])
     sp.add_argument("--destino", help="sincronizar: pasta de destino (padrão: ~/.config/opencode/skills)")
     sp.add_argument("--remover", action="store_true", help="sincronizar: remove do destino as cópias feitas pelo cofre")
+
+    sp = novo("agentes", cmd_agentes, "Agentes do vault (65-Agentes): listar | verificar | sincronizar")
+    sp.add_argument("acao", choices=["listar", "verificar", "sincronizar"])
+    sp.add_argument("--opencode", help="sincronizar: pasta de agentes do OpenCode (padrão: ~/.config/opencode/agents)")
+    sp.add_argument("--hermes", help="sincronizar: config.yaml do Hermes (padrão: ~/.hermes/config.yaml)")
+    sp.add_argument("--remover", action="store_true", help="sincronizar: tira os agentes que o cofre levou")
 
     novo("mcp", cmd_mcp, "Inicia o servidor MCP (stdio)")
 

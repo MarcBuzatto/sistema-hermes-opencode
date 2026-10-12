@@ -31,6 +31,7 @@ Fatos refutados não são apagados: eles aparecem para as IAs como armadilhas, c
 | `40-Clientes` | Um hub por cliente (preferências e restrições) |
 | `50-Fontes` | Material externo: pesquisas, documentação, respostas do NotebookLM |
 | `60-Skills` | Skills que Hermes e OpenCode carregam sob demanda (formato Agent Skills) |
+| `65-Agentes` | Agentes que viram agentes do OpenCode e personalities do Hermes |
 | `80-Anexos` | Imagens e PDFs (o Obsidian salva aqui o que você cola) |
 | `90-Arquivo` | Projetos encerrados e exportações para o NotebookLM |
 | `99-Privado` | O que nenhuma IA deve receber pelo cofre (fora do git) |

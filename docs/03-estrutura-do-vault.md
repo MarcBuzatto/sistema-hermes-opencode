@@ -13,6 +13,7 @@
 | `40-Clientes/` | Hub por cliente (modelo `Cliente`) | Você |
 | `50-Fontes/` | Material externo; `NotebookLM/` com respostas importadas `N-XXXXX` | Você e agentes |
 | `60-Skills/` | Skills no formato Agent Skills (`<categoria>/<skill>/SKILL.md`); `sistema/` tem as do cofre | Você, o instalador (`sistema/`) e o Hermes ao aprender skills (com sua aprovação) |
+| `65-Agentes/` | Agentes (`<nome>.md`: `description`, `mode`, prompt no corpo), levados ao OpenCode (`agents/`) e ao Hermes (personalities) | Você |
 | `80-Anexos/` | Imagens, PDFs e outros binários (o Obsidian salva aqui o que você cola) | Você |
 | `90-Arquivo/` | Projetos encerrados; `Exportacoes-NotebookLM/` (não indexado) | Você / `cofre exportar-notebooklm` |
 | `99-Privado/` | O que nenhuma IA deve receber pelo cofre; fora do git do vault | Você |
@@ -125,6 +126,7 @@ Bases é plugin nativo do Obsidian (sem plugins da comunidade). Os arquivos `.ba
 | `Recursos.base` | Sites, APIs e ferramentas externas (título, quando usar, url) |
 | `Sessoes.base` | Recentes (14 dias), Todas |
 | `Inbox.base` | Para triar (capturas das IAs), Tudo na inbox (inclui as suas) |
+| `Agentes.base` | Agentes em `65-Agentes` (nome, quando usar, modo, modelo) |
 | `Skills.base` | Skills em `60-Skills` (nome, status, quando usar, fontes, pasta) |
 
 `00-Sistema/Inicio.md` junta as visões que pedem ação sua. Ordenação pode ser ajustada pelo menu Sort de cada visão (fica salva no `.base`).

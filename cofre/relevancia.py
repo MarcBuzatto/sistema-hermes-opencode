@@ -32,9 +32,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import frontmatter
-from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista
+from .vault import DIR_EXPORTACOES, GERACAO, IGNORAR_DIRS, PASTAS, Cofre, alvo_link, escrever_atomico, lista, slug
 
-VERSAO_INDICE = 7
+VERSAO_INDICE = 8
 RADICAL = 6
 PESO_APROXIMADO = 0.8
 INDICE_ANTIGO = Path(".cofre") / "indice.json"
@@ -194,6 +194,8 @@ def _analisar(raiz: Path, caminho: Path, mtime: float) -> dict | None:
                         if (raiz / "/".join(partes[:i]) / "SKILL.md").is_file()), None)
             tipo = "skill-ref"
             skill = partes[idx - 1] if idx else None
+    elif rel.startswith(PASTAS["agentes"] + "/") and not tipo:
+        tipo, skill = "agente", slug(caminho.stem, 64)
     elif not tipo:
         tipo = "nota"
     if tipo in TIPOS_FORA:
@@ -310,7 +312,7 @@ class Achado:
 
 def _peso(doc: dict, projeto: str | None) -> float:
     tipo, status = doc.get("tipo"), doc.get("status")
-    peso = {"moc": 1.5, "skill": 1.3, "instrucao": 1.3, "recurso": 1.2, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1,
+    peso = {"moc": 1.5, "skill": 1.3, "agente": 1.2, "instrucao": 1.3, "recurso": 1.2, "skill-ref": 1.0, "fato": 1.1, "decisao": 1.1,
             "fonte": 1.0, "nota": 1.0, "missao": 0.9, "cliente": 1.0, "projeto": 0.9, "sessao": 0.6,
             "captura": 0.5}.get(tipo, 0.9)
     if tipo == "fato":
@@ -472,6 +474,9 @@ def linha(a: Achado) -> str:
     if tipo == "skill":
         aviso = " [RASCUNHO: passos não testados; avise o usuário antes de seguir]" if d.get("status") == "rascunho" else ""
         return f"- skill `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 150)} (carregue a skill se servir){aviso}"
+    if tipo == "agente":
+        return (f"- agente `{d['skill']}` — {_curto(d.get('resumo') or d['titulo'], 130)} "
+                f"(se servir, sugira ao usuário: Hermes /personality {d['skill']}; OpenCode Tab ou @{d['skill']})")
     if tipo == "instrucao":
         return f"- instrução sua: {_curto(d['titulo'], 90)} — siga se a tarefa envolver isso; texto: {por_caminho}"
     if tipo == "moc":

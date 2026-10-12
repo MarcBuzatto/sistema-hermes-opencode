@@ -195,7 +195,7 @@ class TestPluginOpenCode(PluginTeste):
         fonte = (RAIZ / "adapters" / "opencode" / "plugins" / "cofre.js").read_text(encoding="utf-8")
         plugin = self.tmp / "cofre.mjs"
         plugin.write_text(fonte.replace("{{PYTHON}}", json.dumps(sys.executable)[1:-1])
-                          .replace("{{APP}}", json.dumps(str(app))[1:-1]).replace("{{DESTINO_SKILLS}}", "null"),
+                          .replace("{{APP}}", json.dumps(str(app))[1:-1]).replace("{{DESTINO_SKILLS}}", "null").replace("{{DESTINO_AGENTES}}", "null"),
                           encoding="utf-8")
         roteiro = self.tmp / "roteiro.mjs"
         roteiro.write_text(_ROTEIRO, encoding="utf-8")

@@ -20,6 +20,7 @@ import { resolve as resolverCaminho } from "node:path"
 const PYTHON = "{{PYTHON}}"
 const APP = "{{APP}}"
 const DESTINO_SKILLS = {{DESTINO_SKILLS}}
+const DESTINO_AGENTES = {{DESTINO_AGENTES}}
 const TTL_MS = 30_000
 const cacheContexto = new Map()
 const cacheDiretorio = new Map()
@@ -219,6 +220,8 @@ async function diretorioDaSessao(ctx, sessionID) {
 export default {
   id: "cofre",
   async setup(ctx) {
+    // Agentes do vault (65-Agentes) viram agentes do OpenCode; novos aparecem na próxima abertura.
+    if (DESTINO_AGENTES) rodar(["agentes", "sincronizar", "--opencode", DESTINO_AGENTES])
     await ctx.session.hook("context", async (event) => {
       try {
         const dir = await diretorioDaSessao(ctx, event.sessionID)
@@ -254,6 +257,7 @@ export default {
   async server(input) {
     // OpenCode V1 só enxerga ~/.config/opencode/skills/*/SKILL.md: copia as skills do vault ao iniciar.
     if (DESTINO_SKILLS) rodar(["skills", "sincronizar", "--destino", DESTINO_SKILLS])
+    if (DESTINO_AGENTES) rodar(["agentes", "sincronizar", "--opencode", DESTINO_AGENTES])
     const dir = input?.directory || input?.worktree
     return {
       "tool.execute.before": async (_entrada, saida) => {

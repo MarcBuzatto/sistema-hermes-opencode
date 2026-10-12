@@ -41,6 +41,10 @@ As skills ficam em `60-Skills/` no vault e aparecem para Hermes e OpenCode como 
 - `cofre skills listar` e `cofre skills verificar` mostram o que existe e o que está mal formado.
 - O fluxo "pesquisa do NotebookLM -> skill" ainda não está definido: depende da sua pesquisa.
 
+## Agentes
+
+Crie um agente como nota em `65-Agentes/` (modelo `Agente`): nome do arquivo = nome do agente, `description` diz quando usar, o corpo é o prompt. Ele vira agente do OpenCode (Tab ou `@nome`) e personality do Hermes (`/personality nome`) na próxima vez que você abrir cada um, ou na hora com `cofre agentes sincronizar`. Quando o assunto da conversa combina com a `description`, a IA vê a sugestão no bloco de relevância e pode propor a troca.
+
 ## Rotina semanal (10 a 15 minutos)
 
 1. `cofre revisar --salvar` no terminal (relatório em `00-Sistema/Relatorios/`).

@@ -125,13 +125,16 @@ def revisar(cofre: Cofre, projeto: str | None = None, conferir_evidencias: bool 
             achados.append(Achado("info", _rotulo(n), f"captura pendente de triagem na inbox{idade}: {n.caminho.stem}"))
     if not projeto:
         achados += [Achado(g, n, m) for g, n, m in skills_mod.verificar(cofre.raiz)]
+        from . import agentes
+
+        achados += [Achado(g, n, m) for g, n, m in agentes.verificar(cofre.raiz)]
         achados += _revisar_notas_livres(cofre)
         achados += _revisar_privadas(cofre)
     achados.sort(key=lambda a: (GRAVIDADE.get(a.gravidade, 9), a.nota))
     return achados
 
 
-_FORA_DAS_LIVRES = (PASTAS["sistema"], PASTAS["inbox"], PASTAS["sessoes_gerais"], PASTAS["arquivo"])
+_FORA_DAS_LIVRES = (PASTAS["sistema"], PASTAS["inbox"], PASTAS["sessoes_gerais"], PASTAS["arquivo"], PASTAS["agentes"])
 _TITULO_SECAO = re.compile(r"^#{2,6}[ \t]+\S", re.M)
 
 

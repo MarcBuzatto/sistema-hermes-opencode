@@ -42,62 +42,6 @@ PERSONALITY_HERMES = "spec"
 ACOES_PRIVADAS = ("read", "edit", "external_directory")
 
 
-# Roda com o Python do Hermes (que tem PyYAML): lê/edita o config.yaml com valores estruturados e conserta
-# valores que versões antigas do instalador gravaram como texto JSON.
-MESCLA_YAML_HERMES = r"""
-import json, os, sys, tempfile
-import yaml
-caminho, ops = sys.argv[1], json.loads(sys.stdin.read())
-dados = {}
-if os.path.exists(caminho):
-    with open(caminho, encoding="utf-8") as f:
-        dados = yaml.safe_load(f) or {}
-def texto_json(v):
-    if isinstance(v, str) and v[:1] in "[{":
-        try:
-            return json.loads(v)
-        except ValueError:
-            pass
-    return v
-def no(chave, criar):
-    atual = dados
-    partes = chave.split(".")
-    for p in partes[:-1]:
-        if not isinstance(texto_json(atual.get(p)), dict):
-            if not criar:
-                return None, None
-            atual[p] = {}
-        atual[p] = texto_json(atual[p])
-        atual = atual[p]
-    return atual, partes[-1]
-def lista(v):
-    v = texto_json(v)
-    return list(v) if isinstance(v, list) else ([v] if isinstance(v, str) and v else [])
-saida = {}
-for op, chave, valor in ops:
-    pai, folha = no(chave, op not in ("ler", "unset", "remover"))
-    if op == "ler":
-        saida[chave] = texto_json(pai.get(folha)) if pai is not None else None
-    elif op == "set":
-        pai[folha] = valor
-    elif op == "unset" and pai is not None:
-        pai.pop(folha, None)
-    elif op == "add":
-        pai[folha] = [x for x in lista(pai.get(folha)) if x != valor] + [valor]
-    elif op == "remover" and pai is not None and folha in pai:
-        resto = [x for x in lista(pai.get(folha)) if x != valor]
-        if resto:
-            pai[folha] = resto
-        else:
-            pai.pop(folha)
-if any(op != "ler" for op, _, _ in ops):
-    os.makedirs(os.path.dirname(caminho) or ".", exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(caminho) or ".", prefix=".config.", suffix=".tmp")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        yaml.safe_dump(dados, f, sort_keys=False, allow_unicode=True)
-    os.replace(tmp, caminho)
-print(json.dumps(saida, ensure_ascii=False))
-"""
 
 
 def _home_dados() -> Path:
@@ -300,9 +244,14 @@ class Instalador:
             texto = (RAIZ / "adapters" / "opencode" / "plugins" / "cofre.js").read_text(encoding="utf-8")
             texto = texto.replace("{{PYTHON}}", json.dumps(str(self.python))[1:-1]).replace(
                 "{{APP}}", json.dumps(str(self.app))[1:-1]).replace(
-                "{{DESTINO_SKILLS}}", json.dumps(str(destino_sync)) if destino_sync else "null")
+                "{{DESTINO_SKILLS}}", json.dumps(str(destino_sync)) if destino_sync else "null").replace(
+                "{{DESTINO_AGENTES}}", json.dumps(str(self.opencode_dir / "agents")))
             self.escrever(plugin, texto)
         self._opencode_config(remover, versao)
+        if self.vault:
+            argumentos = ["agentes", "sincronizar", "--opencode", str(self.opencode_dir / "agents")] + (
+                ["--remover"] if remover else [])
+            self.rodar([str(self.python), str(self.app), *argumentos], "agentes do vault -> OpenCode")
         if destino_sync and self.vault:
             argumentos = ["skills", "sincronizar", "--destino", str(destino_sync)] + (["--remover"] if remover else [])
             self.rodar([str(self.python), str(self.app), *argumentos], "skills do vault -> OpenCode V1")
@@ -450,40 +399,19 @@ class Instalador:
         python_hermes = self._python_hermes(exe) if exe else None
         if python_hermes:
             self._configurar_hermes(python_hermes, remover)
+            self._agentes_hermes(python_hermes, remover)
         else:
             self.pendencias.append(self._instrucoes_hermes_manual(remover, exe))
 
     def _python_hermes(self, exe: str) -> Path | None:
-        """Interpretador do próprio Hermes (traz PyYAML). `hermes config set` não serve para valores
-        estruturados: até a 0.19 ele grava JSON como texto, e o MCP/plugin ficam inválidos."""
-        alvo = Path(exe).resolve()
-        candidatos: list[Path] = []
-        if WIN:
-            candidatos += [alvo.parent / "python.exe", alvo.parent.parent / "python.exe"]
-        else:
-            try:
-                primeira = alvo.read_bytes()[:512].split(b"\n", 1)[0].decode("utf-8", "replace")
-            except OSError:
-                primeira = ""
-            if primeira.startswith("#!"):
-                partes = primeira[2:].strip().split()
-                if partes and Path(partes[0]).name == "env" and len(partes) > 1:
-                    achado = shutil.which(partes[-1])
-                    if achado:
-                        candidatos.append(Path(achado))
-                elif partes:
-                    candidatos.append(Path(partes[0]))
-            candidatos += [alvo.parent / "python3", alvo.parent / "python"]
-        for candidato in candidatos:
-            try:
-                if candidato.is_file() and subprocess.run([str(candidato), "-c", "import yaml"], capture_output=True,
-                                                          timeout=30).returncode == 0:
-                    return candidato
-            except (OSError, subprocess.SubprocessError):
-                continue
-        return None
+        from cofre.hermes_config import python_hermes
+
+        return python_hermes(exe)
 
     def _yaml_hermes(self, python_hermes: Path, ops: list) -> dict | None:
+        from cofre.config import ErroCofre
+        from cofre.hermes_config import aplicar
+
         escreve = any(op[0] != "ler" for op in ops)
         if escreve and self.seco:
             for op in ops:
@@ -493,17 +421,13 @@ class Instalador:
         if escreve:
             self.backup(arquivo)
         try:
-            r = subprocess.run([str(python_hermes), "-c", MESCLA_YAML_HERMES, str(arquivo)], input=json.dumps(ops),
-                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
-        except (OSError, subprocess.SubprocessError) as e:
-            self.aviso(f"não consegui editar {arquivo}: {e}")
-            return None
-        if r.returncode != 0:
-            self.aviso(f"não consegui editar {arquivo}: {(r.stderr or '').strip()[-300:]}")
+            lidos = aplicar(python_hermes, arquivo, ops)
+        except ErroCofre as e:
+            self.aviso(str(e))
             return None
         if escreve:
             self.info(f"hermes config.yaml: {', '.join(f'{op[0]} {op[1]}' for op in ops if op[0] != 'ler')}")
-        return json.loads(r.stdout or "{}")
+        return lidos
 
     def _configurar_hermes(self, python_hermes: Path, remover: bool) -> None:
         chave_spec = f"agent.personalities.{PERSONALITY_HERMES}"
@@ -545,6 +469,23 @@ class Instalador:
         else:
             ops.append(["set", chave_spec, self._personality_spec()])
         self._yaml_hermes(python_hermes, ops)
+
+    def _agentes_hermes(self, python_hermes: Path, remover: bool) -> None:
+        if not self.vault or self.seco:
+            return
+        from cofre import agentes
+        from cofre.config import ErroCofre
+
+        try:
+            escritos, removidos, avisos = agentes.sincronizar_hermes(
+                self.vault, self.hermes_home / "config.yaml", python_hermes, remover=remover)
+        except ErroCofre as e:
+            self.aviso(f"agentes do vault -> Hermes: {e}")
+            return
+        for aviso in avisos:
+            self.aviso(aviso)
+        if escritos or removidos:
+            self.info(f"agentes do vault -> Hermes: {len(escritos)} personality(s) gravada(s), {len(removidos)} removida(s)")
 
     def _personality_spec(self) -> dict:
         """Personality 'spec' no Hermes (equivalente ao agente spec do OpenCode): /personality spec."""
