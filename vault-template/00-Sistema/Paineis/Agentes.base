@@ -1,0 +1,19 @@
+filters:
+  and:
+    - file.inFolder("65-Agentes")
+    - file.hasProperty("description")
+properties:
+  description:
+    displayName: Quando usar
+  mode:
+    displayName: Modo
+  model:
+    displayName: Modelo
+views:
+  - type: table
+    name: Agentes
+    order:
+      - file.name
+      - description
+      - mode
+      - model

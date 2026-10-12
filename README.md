@@ -1,1 +1,106 @@
-# sistema-hermes-opencode
+# Cofre — memória epistêmica em Obsidian para Hermes e OpenCode
+
+Sistema para as IAs de terminal do seu PC (Hermes Agent e OpenCode, com Claude Code CLI e Codex CLI opcionais) compartilharem **uma memória de longo prazo organizada no Obsidian**, separando o que foi **comprovado** do que foi **suposto**.
+
+## O problema que ele resolve
+
+Modelos mais fracos (como os gratuitos do OpenCode Zen usados no Hermes) não são "burros": eles **guardam errado**. Três falhas se combinam:
+
+1. **Esquecem** dentro da própria conversa (compactação/resumo perde detalhes).
+2. **Registram suposição como verdade** — na memória nativa do Hermes (`MEMORY.md`, escrita até em segundo plano) ou no próprio histórico.
+3. **Persistem no erro**: a informação errada volta em toda sessão, e o modelo a defende porque "está na memória".
+
+O Cofre ataca as três com regras que rodam **em código**, não só no prompt:
+
+| Falha | Mecanismo |
+| --- | --- |
+| Esquecimento | Estado de trabalho por projeto + checkpoints; contexto reinjetado no prompt de sistema (Hermes) e a cada chamada (OpenCode), inclusive na compactação |
+| Não ler o que importa para o assunto | A cada mensagem sua, o plugin procura no vault inteiro o que tem a ver com o assunto (notas livres, fatos, decisões, fontes, skills) e mostra à IA poucas linhas apontando para isso; ela abre só o que servir. Falou de pentest, aparecem a skill de pentest, suas notas do Burp e o escopo autorizado pelo cliente, mesmo com "penteast" digitado errado |
+| Suposição virando fato | Todo fato nasce `hipotese`; `verificado` exige evidência, e evidência de arquivo é **conferida no disco** (trecho inventado é rejeitado) |
+| Persistir no erro | Fato refutado vira **armadilha** visível em toda sessão, com a versão correta ao lado; registrar de novo a afirmação refutada (ou paráfrase) é **bloqueado** |
+| Memória nativa contaminada | Instalador desliga o `MEMORY.md` do Hermes, liga aprovação para `USER.md`/skills e leva as entradas antigas para triagem |
+| Trabalho longo sem rumo, "pronto" sem testar | Specs (SDD): requisitos e tarefas aprovados por você; uma tarefa por vez; o cofre roda o comando de verificação e só aceita a tarefa se passar; regressão no fim; linha AGORA com o próximo passo em toda chamada. Agente `spec` no OpenCode, personality `spec` no Hermes ([docs/08](docs/08-specs-e-harness.md)) |
+| Chamada de ferramenta malfeita | Argumentos tolerantes (JSON em texto, chaves em inglês, ID mal escrito com sugestão), exemplo da chamada correta no erro e "PARE" quando o modelo repete a mesma chamada que falhou |
+
+Nada disso vai para o seu `AGENTS.md` (nem para o `SOUL.md` do Hermes): o protocolo chega aos modelos pelos plugins (prompt de sistema, poucas linhas), pelas instruções do servidor MCP e pela skill `cofre-protocolo`, carregada só quando precisa. As **skills** também ficam no vault (`60-Skills/`), e Hermes e OpenCode leem de lá.
+
+## Como fica
+
+```
+Obsidian (vault "Cofre")          <- você lê, edita e aprova
+   ^            ^
+   |  MCP "cofre" (13 ferramentas com validação)
+   |            |
+Hermes        OpenCode            <- usam o ecossistema
+(plugin:      (plugin: contexto
+ contexto no   no sistema + na
+ sistema)      compactação)
+   ^            ^
+   +-- skills de 60-Skills/ (no vault)
+
+Claude Desktop / ChatGPT app      <- NÃO tocados
+```
+
+Detalhes em [docs/01-arquitetura.md](docs/01-arquitetura.md).
+
+## Instalação rápida
+
+Requer Python 3.9+ (o do Hermes serve) e git (recomendado).
+
+```bash
+git clone https://github.com/marcbuzatto/sistema-hermes-opencode.git
+cd sistema-hermes-opencode
+python3 scripts/instalar.py --vault ~/Obsidian/Cofre --git
+```
+
+No Windows (PowerShell):
+
+```powershell
+git clone https://github.com/marcbuzatto/sistema-hermes-opencode.git
+cd sistema-hermes-opencode
+py -3 scripts\instalar.py --vault "$env:USERPROFILE\Obsidian\Cofre" --git
+```
+
+Depois abra a pasta do vault no Obsidian ("Abrir pasta como cofre") e vincule seu primeiro projeto:
+
+```bash
+cd ~/dev/meu-projeto
+cofre projeto criar meu-projeto --nome "Meu Projeto" --caminho . --humano
+```
+
+Guia completo (Windows nativo, WSL, Linux/macOS, verificação e desinstalação): [docs/05-instalacao.md](docs/05-instalacao.md).
+
+## Uso no dia a dia
+
+| Onde | O que fazer |
+| --- | --- |
+| OpenCode | `/ctx` no início, `/checkpoint` ao fim de cada etapa, `/corrigir <correção>` quando a IA errar, `/revisar-cofre` de vez em quando; `/spec <o que construir>` e `/proxima` para trabalho grande (agente `spec`) |
+| Hermes | `/cofre-checkpoint`, `/cofre-corrigir`, `/cofre-revisar` (skills viram comandos); `/personality spec` para trabalho grande |
+| Obsidian | Nota `00-Sistema/Inicio`: hipóteses, contestados, revisão vencida, decisões aguardando você, inbox, skills |
+| Terminal | `cofre revisar --salvar` semanal; `cofre contexto` para ver o que as IAs recebem; `cofre agents-md analisar` para enxugar um AGENTS.md grande |
+
+Mais em [docs/07-uso-diario.md](docs/07-uso-diario.md).
+
+## Estrutura do repositório
+
+| Caminho | Conteúdo |
+| --- | --- |
+| `cofre/` | Motor em Python puro (sem dependências): vault, regras epistêmicas, contexto, skills, revisão, NotebookLM, CLI e servidor MCP |
+| `vault-template/` | Vault inicial: pastas (inclusive `60-Skills`), perfil, configuração, painéis (Bases), modelos e um projeto de exemplo |
+| `adapters/shared/skills/` | Skills do cofre (`cofre-protocolo` com o protocolo completo, `cofre-sdd`, checkpoint, corrigir, revisar, NotebookLM), instaladas em `60-Skills/sistema/` |
+| `adapters/hermes/` | Plugin do Hermes e exemplo de `config.yaml` |
+| `adapters/opencode/` | Comandos, agente `spec` e plugin (V1 e V2) |
+| `scripts/instalar.py` | Instalador/desinstalador multiplataforma, idempotente, com `--dry-run` |
+| `docs/` | Arquitetura, protocolo, estrutura do vault, integrações, instalação, NotebookLM e uso diário |
+| `tests/` | Testes (`python3 -m unittest discover -s tests`) |
+
+## Documentação
+
+1. [Arquitetura](docs/01-arquitetura.md)
+2. [Protocolo epistêmico](docs/02-protocolo-epistemico.md)
+3. [Estrutura do vault](docs/03-estrutura-do-vault.md)
+4. [Integrações (Hermes, OpenCode, isolamento dos apps)](docs/04-integracoes.md)
+5. [Instalação](docs/05-instalacao.md)
+6. [NotebookLM](docs/06-notebooklm.md)
+7. [Uso diário](docs/07-uso-diario.md)
+8. [Specs (SDD) e harness](docs/08-specs-e-harness.md)

@@ -1,0 +1,24 @@
+filters:
+  and:
+    - 'tipo == "sessao"'
+    - not:
+        - file.inFolder("00-Sistema")
+views:
+  - type: table
+    name: Recentes
+    filters:
+      and:
+        - 'file.mtime > now() - "14d"'
+    order:
+      - file.name
+      - projeto
+      - agente
+      - atualizada
+  - type: table
+    name: Todas
+    order:
+      - file.name
+      - projeto
+      - agente
+      - iniciada
+      - atualizada

@@ -1,0 +1,91 @@
+filters:
+  and:
+    - 'tipo == "fato"'
+    - not:
+        - file.inFolder("00-Sistema")
+properties:
+  afirmacao:
+    displayName: Afirmação
+  status:
+    displayName: Status
+  projeto:
+    displayName: Projeto
+  fonte:
+    displayName: Fonte
+  registrado_por:
+    displayName: Registrado por
+  registrado_em:
+    displayName: Registrado em
+  verificado_em:
+    displayName: Verificado em
+  revisar_em:
+    displayName: Revisar em
+  motivo:
+    displayName: Motivo
+  substituido_por:
+    displayName: Correto
+views:
+  - type: table
+    name: Hipóteses abertas
+    filters:
+      and:
+        - 'status == "hipotese"'
+    order:
+      - afirmacao
+      - projeto
+      - registrado_por
+      - registrado_em
+  - type: table
+    name: Verificados
+    filters:
+      and:
+        - 'status == "verificado"'
+    order:
+      - afirmacao
+      - projeto
+      - fonte
+      - verificado_em
+      - revisar_em
+  - type: table
+    name: Revisão vencida
+    filters:
+      and:
+        - 'status == "verificado"'
+        - 'revisar_em < today()'
+    order:
+      - afirmacao
+      - projeto
+      - revisar_em
+  - type: table
+    name: Contestados
+    filters:
+      and:
+        - 'status == "contestado"'
+    order:
+      - afirmacao
+      - projeto
+      - motivo
+  - type: table
+    name: Armadilhas (refutados)
+    filters:
+      and:
+        - 'status == "refutado"'
+    order:
+      - afirmacao
+      - motivo
+      - substituido_por
+      - projeto
+  - type: kanban
+    name: Por status
+    groupBy:
+      property: note.status
+      direction: ASC
+    groupOrder:
+      - hipotese
+      - contestado
+      - verificado
+      - refutado
+      - obsoleto
+    order:
+      - afirmacao
+      - projeto

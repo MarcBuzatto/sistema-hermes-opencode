@@ -1,0 +1,31 @@
+filters:
+  and:
+    - 'tipo == "decisao"'
+    - not:
+        - file.inFolder("00-Sistema")
+views:
+  - type: table
+    name: Propostas aguardando você
+    filters:
+      and:
+        - 'status == "proposta"'
+    order:
+      - titulo
+      - projeto
+      - registrado_por
+      - registrado_em
+  - type: table
+    name: Aceitas
+    filters:
+      and:
+        - 'status == "aceita"'
+    order:
+      - titulo
+      - projeto
+      - decidido_em
+  - type: table
+    name: Todas
+    order:
+      - titulo
+      - status
+      - projeto

@@ -1,0 +1,19 @@
+filters:
+  and:
+    - 'tipo == "recurso"'
+    - not:
+        - file.inFolder("00-Sistema")
+properties:
+  titulo:
+    displayName: Título
+  quando_usar:
+    displayName: Quando usar
+views:
+  - type: table
+    name: Todos
+    order:
+      - titulo
+      - quando_usar
+      - url
+      - projeto
+      - tags

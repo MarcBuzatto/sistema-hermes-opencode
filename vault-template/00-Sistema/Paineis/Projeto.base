@@ -1,0 +1,80 @@
+filters:
+  and:
+    - file.hasLink(this.file)
+properties:
+  afirmacao:
+    displayName: Afirmação
+  titulo:
+    displayName: Título
+views:
+  - type: table
+    name: Hipóteses
+    filters:
+      and:
+        - 'tipo == "fato"'
+        - 'status == "hipotese"'
+    order:
+      - afirmacao
+      - registrado_por
+      - registrado_em
+  - type: table
+    name: Verificados
+    filters:
+      and:
+        - 'tipo == "fato"'
+        - 'status == "verificado"'
+    order:
+      - afirmacao
+      - fonte
+      - verificado_em
+      - revisar_em
+  - type: table
+    name: Contestados e armadilhas
+    filters:
+      and:
+        - 'tipo == "fato"'
+        - or:
+            - 'status == "contestado"'
+            - 'status == "refutado"'
+    order:
+      - afirmacao
+      - status
+      - motivo
+      - substituido_por
+  - type: table
+    name: Decisões
+    filters:
+      and:
+        - 'tipo == "decisao"'
+    order:
+      - titulo
+      - status
+      - decidido_em
+  - type: table
+    name: Sessões
+    filters:
+      and:
+        - 'tipo == "sessao"'
+    order:
+      - file.name
+      - agente
+      - atualizada
+  - type: table
+    name: Specs
+    filters:
+      and:
+        - 'tipo == "spec"'
+    order:
+      - titulo
+      - status
+      - aprovada_em
+      - atualizada
+  - type: table
+    name: Recursos
+    filters:
+      and:
+        - 'tipo == "recurso"'
+    order:
+      - titulo
+      - quando_usar
+      - url

@@ -1,0 +1,26 @@
+# Trechos que o instalador aplica no ~/.hermes/config.yaml via `hermes config set`.
+# Use este arquivo só se preferir editar à mão. Troque os caminhos pelos da sua instalação
+# (o instalador imprime os valores exatos).
+
+mcp_servers:
+  cofre:
+    command: /home/VOCE/.local/share/cofre/python   # Python usado na instalação (sys.executable)
+    args: ["/home/VOCE/.local/share/cofre/app", "mcp"]
+    env:
+      COFRE_AGENTE: hermes
+    timeout: 60
+
+plugins:
+  enabled:
+    - cofre
+
+skills:
+  create_dir: /home/VOCE/Obsidian/Cofre/60-Skills   # lê as skills do vault e cria as novas lá
+  disabled:
+    - obsidian          # skill nativa que escreve no vault sem as regras do cofre
+  write_approval: true  # skills criadas pelo agente passam por você
+
+memory:
+  memory_enabled: false   # MEMORY.md (notas do agente) desligado: fatos vão para o cofre
+  user_profile_enabled: true
+  write_approval: true    # USER.md só muda com sua aprovação (/memory pending)

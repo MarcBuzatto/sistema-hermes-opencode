@@ -1,0 +1,22 @@
+filters:
+  and:
+    - file.inFolder("60-Skills")
+    - file.hasProperty("description")
+properties:
+  name:
+    displayName: Nome
+  description:
+    displayName: Quando usar
+  status:
+    displayName: Status
+  fontes:
+    displayName: Fontes
+views:
+  - type: table
+    name: Skills
+    order:
+      - name
+      - status
+      - description
+      - fontes
+      - file.folder
